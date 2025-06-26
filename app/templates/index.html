@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Carte ISGB - Gestion des Départements</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+      #map {
+        height: 100vh;
+      }
+      .info-panel {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        background: white;
+        padding: 15px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        width: 300px;
+      }
+      .legend {
+        line-height: 1.5;
+        color: #555;
+      }
+      .legend i {
+        width: 18px;
+        height: 18px;
+        float: left;
+        margin-right: 8px;
+        opacity: 0.7;
+      }
+      .custom-popup {
+        font-size: 14px;
+      }
+      .leaflet-popup-content-wrapper {
+        border-radius: 4px;
+      }
+      .leaflet-popup-content {
+        margin: 8px 12px;
+      }
+      .leaflet-control-layers {
+        border-radius: 4px;
+      }
+      .leaflet-touch .leaflet-control-layers {
+        border: 2px solid rgba(0, 0, 0, 0.2);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div class="info-panel">
+      <h4 class="text-center mb-3">Carte ISGB</h4>
+      <div class="legend">
+        <p><i style="background: #3388ff"></i>Zone ISGB</p>
+        <p><i style="background: #ff7800"></i>Départements</p>
+        <hr />
+        <div class="d-grid gap-2">
+          <button id="zoom-to-isgb" class="btn btn-primary btn-sm">
+            Zoom sur ISGB
+          </button>
+          <button id="show-coords" class="btn btn-secondary btn-sm">
+            Afficher les coordonnées
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+      // Configuration initiale
+      const map = L.map("map");
+      const drawnItems = new L.FeatureGroup();
+      let isgbPolygonGeoJSON;
+      let isgbLayer;
+
+      // Styles
+      const isgbStyle = {
+        color: "#3388ff",
+        weight: 4,
+        opacity: 1,
+        fillColor: "#3388ff",
+        fillOpacity: 0.2,
+        dashArray: "5, 5",
+      };
+      const departmentStyle = {
+        color: "#ff7800",
+        weight: 3,
+        opacity: 1,
+        fillColor: "#ff7800",
+        fillOpacity: 0.4,
+      };
+
+      // Initialisation
+      function initMap() {
+        // 1. Charger le GeoJSON ISGB
+        fetch("static/data/isgb.geojson")
+          .then((response) => response.json())
+          .then((data) => {
+            isgbPolygonGeoJSON = data.features[0];
+
+            // 2. Configurer la carte centrée sur ISGB
+            const center = turf.center(isgbPolygonGeoJSON).geometry.coordinates;
+            map.setView([center[1], center[0]], 18);
+
+            // 3. Ajouter la couche OSM
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+              maxZoom: 22,
+              attribution:
+                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            }).addTo(map);
+
+            // 4. Afficher le polygone ISGB
+            isgbLayer = L.geoJSON(isgbPolygonGeoJSON, {
+              style: isgbStyle,
+            }).addTo(map);
+            updateISGBPopup();
+
+            // 5. Initialiser les autres fonctionnalités
+            initFeatures();
+          })
+          .catch((error) => {
+            console.error("Erreur de chargement:", error);
+            showToast("Erreur: Fichier isgb.json introuvable", "danger");
+          });
+      }
+
+      function initFeatures() {
+        // Groupe pour les éléments dessinés
+        map.addLayer(drawnItems);
+
+        // Contrôle de dessin
+        const drawControl = new L.Control.Draw({
+          draw: {
+            polygon: {
+              allowIntersection: false,
+              showArea: true,
+              metric: true,
+              shapeOptions: departmentStyle,
+            },
+            marker: false,
+            circle: false,
+            rectangle: false,
+            polyline: false,
+            circlemarker: false,
+          },
+          edit: { featureGroup: drawnItems },
+        });
+        map.addControl(drawControl);
+
+        // Charger les départements existants
+        loadDepartments();
+
+        // Événements
+        map.on(L.Draw.Event.CREATED, handlePolygonCreation);
+        document
+          .getElementById("zoom-to-isgb")
+          .addEventListener("click", zoomToISGB);
+        document
+          .getElementById("show-coords")
+          .addEventListener("click", showCoordinates);
+      }
+
+      function updateISGBPopup() {
+        const area = turf.area(isgbPolygonGeoJSON).toFixed(0);
+        isgbLayer.bindPopup(`
+          <div class="custom-popup">
+            <h5>${isgbPolygonGeoJSON.properties?.name || "ISGB"}</h5>
+            <p><strong>Superficie:</strong> ${area} m²</p>
+          </div>
+        `);
+      }
+
+      function loadDepartments() {
+        fetch("/get-polygons/")
+          .then((res) => res.json())
+          .then((data) => {
+            L.geoJSON(data, {
+              style: departmentStyle,
+              onEachFeature: (feature, layer) => {
+                if (feature.properties?.name) {
+                  layer.bindPopup(`
+                    <div class="custom-popup">
+                      <h5>${feature.properties.name}</h5>
+                      <p><strong>Superficie:</strong> ${turf
+                        .area(feature)
+                        .toFixed(0)} m²</p>
+                    </div>
+                  `);
+                }
+                drawnItems.addLayer(layer);
+              },
+            });
+          })
+          .catch((error) => console.error("Erreur de chargement:", error));
+      }
+
+      function handlePolygonCreation(event) {
+        const layer = event.layer;
+        const drawnGeoJSON = layer.toGeoJSON();
+        const area = turf.area(drawnGeoJSON).toFixed(0);
+
+        if (!turf.booleanWithin(drawnGeoJSON, isgbPolygonGeoJSON)) {
+          alert("Le département doit être entièrement dans la zone ISGB!");
+          return;
+        }
+
+        if (turf.area(drawnGeoJSON) < 100) {
+          alert("Superficie minimale: 100 m²!");
+          return;
+        }
+
+        const departmentName = prompt(`Nom du département (${area} m²):`);
+        if (!departmentName) return;
+
+        saveDepartment(departmentName, drawnGeoJSON, layer);
+      }
+
+      function saveDepartment(name, geojson, layer) {
+        fetch("/save-polygon/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken"),
+          },
+          body: JSON.stringify({
+            name: name,
+            polygon: geojson.geometry,
+            area: turf.area(geojson).toFixed(0),
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              layer.feature = {
+                type: "Feature",
+                properties: { name: name },
+                geometry: geojson.geometry,
+              };
+              layer
+                .bindPopup(
+                  `
+              <div class="custom-popup">
+                <h5>${name}</h5>
+                <p><strong>Superficie:</strong> ${turf
+                  .area(geojson)
+                  .toFixed(0)} m²</p>
+              </div>
+            `
+                )
+                .openPopup();
+              drawnItems.addLayer(layer);
+              showToast("Département enregistré!", "success");
+            }
+          })
+          .catch((error) => {
+            console.error("Erreur:", error);
+            showToast("Erreur d'enregistrement", "danger");
+          });
+      }
+
+      function zoomToISGB() {
+        map.fitBounds(isgbLayer.getBounds(), {
+          padding: [50, 50],
+          maxZoom: 18,
+        });
+      }
+
+      function showCoordinates() {
+        const coords = isgbPolygonGeoJSON.geometry.coordinates[0]
+          .map((coord) => `${coord[1].toFixed(6)}, ${coord[0].toFixed(6)}`)
+          .join("<br>");
+
+        isgbLayer
+          .bindPopup(
+            `
+          <div class="custom-popup">
+            <h5>Coordonnées ISGB</h5>
+            <div style="max-height: 200px; overflow-y: auto;">${coords}</div>
+          </div>
+        `
+          )
+          .openPopup();
+      }
+
+      function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(";").shift();
+      }
+
+      function showToast(message, type = "info") {
+        const toast = document.createElement("div");
+        toast.className = `position-fixed bottom-0 end-0 p-3`;
+        toast.style.zIndex = "1100";
+        toast.innerHTML = `
+          <div class="toast show align-items-center text-white bg-${type} border-0">
+            <div class="d-flex">
+              <div class="toast-body">${message}</div>
+              <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+          </div>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+        toast
+          .querySelector("button")
+          .addEventListener("click", () => toast.remove());
+      }
+
+      // Démarrer l'application
+      initMap();
+    </script>
+  </body>
+</html>
