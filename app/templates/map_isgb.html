@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>ISGB - Zone délimitée</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+      #map {
+        height: 600px;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Zone de l’Institut Supérieur de Gestion de Bizerte (ISGB)</h2>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+      // Initialisation de la carte
+      var map = L.map("map", {
+        center: [37.236316, 9.881741],
+        zoom: 17,
+        dragging: false,
+        zoomControl: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
+        tap: false,
+        touchZoom: false,
+      });
+
+      // Ajout des tuiles OpenStreetMap
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(map);
+
+      // === Définir le polygone de la zone ISGB ===
+      var isgbZone = L.polygon(
+        [
+          [37.2367, 9.8814],
+          [37.2367, 9.882],
+          [37.236, 9.882],
+          [37.236, 9.8814],
+        ],
+        {
+          color: "blue",
+          fillColor: "#3388ff",
+          fillOpacity: 0.5,
+        }
+      ).addTo(map);
+
+      isgbZone.bindPopup("Zone cliquable : ISGB");
+
+      // Autoriser les clics uniquement sur la zone
+      isgbZone.on("click", function () {
+        isgbZone.openPopup();
+      });
+
+      // Désactiver les clics sur le fond de la carte
+      map.on("click", function (e) {
+        alert("Cliquez uniquement dans la zone bleue de l'ISGB.");
+      });
+    </script>
+  </body>
+</html>
