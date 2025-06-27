@@ -137,5 +137,4 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-# GDAL (pour les champs géospatiaux)
-GDAL_LIBRARY_PATH = r"C:\Users\DELL\Downloads\release-1930-x64-gdal-3-10-3-mapserver-8-2-2\bin\gdal.dll"
+
