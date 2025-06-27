@@ -61,6 +61,9 @@
       .leaflet-touch .leaflet-control-layers {
         border: 2px solid rgba(0, 0, 0, 0.2);
       }
+      .leaflet-marker-icon {
+        cursor: pointer;
+      }
     </style>
   </head>
   <body>
@@ -70,6 +73,10 @@
       <div class="legend">
         <p><i style="background: #3388ff"></i>Zone ISGB</p>
         <p><i style="background: #ff7800"></i>Départements</p>
+        <p>
+          <input type="checkbox" id="toggle-cameras" checked style="margin-right:5px;" />
+          <label for="toggle-cameras">Caméras</label>
+        </p>
         <hr />
         <div class="d-grid gap-2">
           <button id="zoom-to-isgb" class="btn btn-primary btn-sm">
@@ -90,7 +97,8 @@
     <script>
       // Configuration initiale
       const map = L.map("map");
-      const drawnItems = new L.FeatureGroup();
+      const drawnItems = new L.FeatureGroup();   // polygons group
+      const cameraLayer = new L.FeatureGroup();  // camera markers group
       let isgbPolygonGeoJSON;
       let isgbLayer;
 
@@ -111,7 +119,14 @@
         fillOpacity: 0.4,
       };
 
-      // Initialisation
+      // Camera icon
+      const cameraIcon = L.icon({
+        iconUrl: "https://cdn-icons-png.flaticon.com/512/2409/2409342.png",
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32],
+      });
+
       function initMap() {
         // 1. Charger le GeoJSON ISGB
         fetch("static/data/isgb.geojson")
@@ -146,10 +161,11 @@
       }
 
       function initFeatures() {
-        // Groupe pour les éléments dessinés
+        // Ajouter les groupes au map
         map.addLayer(drawnItems);
+        map.addLayer(cameraLayer);
 
-        // Contrôle de dessin
+        // Contrôle de dessin - polygon + marker(camera)
         const drawControl = new L.Control.Draw({
           draw: {
             polygon: {
@@ -158,27 +174,113 @@
               metric: true,
               shapeOptions: departmentStyle,
             },
-            marker: false,
+            marker: {
+              icon: cameraIcon,
+            },
             circle: false,
             rectangle: false,
             polyline: false,
             circlemarker: false,
           },
-          edit: { featureGroup: drawnItems },
+          edit: {
+            featureGroup: new L.FeatureGroup([drawnItems, cameraLayer]),
+          },
         });
         map.addControl(drawControl);
 
-        // Charger les départements existants
         loadDepartments();
 
-        // Événements
-        map.on(L.Draw.Event.CREATED, handlePolygonCreation);
+        // Gestion création polygones ou caméras
+        map.on(L.Draw.Event.CREATED, function (event) {
+          const layer = event.layer;
+
+          if (event.layerType === "polygon") {
+            const drawnGeoJSON = layer.toGeoJSON();
+            if (!turf.booleanWithin(drawnGeoJSON, isgbPolygonGeoJSON)) {
+              alert("Le département doit être entièrement dans la zone ISGB!");
+              return;
+            }
+            if (turf.area(drawnGeoJSON) < 100) {
+              alert("Superficie minimale: 100 m²!");
+              return;
+            }
+
+            const area = turf.area(drawnGeoJSON).toFixed(0);
+            const departmentName = prompt(`Nom du département (${area} m²):`);
+            if (!departmentName) return;
+
+            saveDepartment(departmentName, drawnGeoJSON, layer);
+          } else if (event.layerType === "marker") {
+            // Ajouter marqueur caméra au groupe dédié
+            cameraLayer.addLayer(layer);
+
+            // Popup formulaire caméra
+            const formHtml = `
+              <div style="min-width: 250px;">
+                <h6>Ajouter une caméra</h6>
+                <div class="mb-2">
+                  <label class="form-label">Nom:</label>
+                  <input type="text" class="form-control" id="cam-name" />
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">Lien vidéo:</label>
+                  <input type="text" class="form-control" id="cam-url" />
+                </div>
+                <button class="btn btn-sm btn-primary w-100" onclick="saveCamera(this)">Enregistrer</button>
+              </div>
+            `;
+            layer.bindPopup(formHtml).openPopup();
+          }
+        });
+
         document
           .getElementById("zoom-to-isgb")
           .addEventListener("click", zoomToISGB);
         document
           .getElementById("show-coords")
           .addEventListener("click", showCoordinates);
+
+        // Gestion du toggle caméra via checkbox dans la légende
+        document
+          .getElementById("toggle-cameras")
+          .addEventListener("change", function () {
+            if (this.checked) {
+              map.addLayer(cameraLayer);
+            } else {
+              map.removeLayer(cameraLayer);
+            }
+          });
+      }
+
+      // Enregistrer caméra (appelé depuis popup bouton)
+      function saveCamera(button) {
+        const popup = button.closest(".leaflet-popup-content");
+        const name = popup.querySelector("#cam-name").value.trim();
+        const url = popup.querySelector("#cam-url").value.trim();
+        if (!name || !url) {
+          alert("Veuillez remplir les deux champs !");
+          return;
+        }
+
+        // Trouver la couche marker associée
+        let markerLayer = null;
+        cameraLayer.eachLayer((layer) => {
+          if (
+            layer.getPopup() &&
+            layer.getPopup().getContent().includes("Ajouter une caméra") &&
+            layer.getPopup().isOpen()
+          ) {
+            markerLayer = layer;
+          }
+        });
+
+        const updatedContent = `<div class="custom-popup"><h6>${name}</h6><a href="${url}" target="_blank">${url}</a></div>`;
+
+        if (markerLayer) {
+          markerLayer.bindPopup(updatedContent).openPopup();
+        }
+
+        showToast("Caméra ajoutée avec succès", "success");
       }
 
       function updateISGBPopup() {
@@ -215,27 +317,6 @@
           .catch((error) => console.error("Erreur de chargement:", error));
       }
 
-      function handlePolygonCreation(event) {
-        const layer = event.layer;
-        const drawnGeoJSON = layer.toGeoJSON();
-        const area = turf.area(drawnGeoJSON).toFixed(0);
-
-        if (!turf.booleanWithin(drawnGeoJSON, isgbPolygonGeoJSON)) {
-          alert("Le département doit être entièrement dans la zone ISGB!");
-          return;
-        }
-
-        if (turf.area(drawnGeoJSON) < 100) {
-          alert("Superficie minimale: 100 m²!");
-          return;
-        }
-
-        const departmentName = prompt(`Nom du département (${area} m²):`);
-        if (!departmentName) return;
-
-        saveDepartment(departmentName, drawnGeoJSON, layer);
-      }
-
       function saveDepartment(name, geojson, layer) {
         fetch("/save-polygon/", {
           method: "POST",
@@ -258,16 +339,14 @@
                 geometry: geojson.geometry,
               };
               layer
-                .bindPopup(
-                  `
+                .bindPopup(`
               <div class="custom-popup">
                 <h5>${name}</h5>
-                <p><strong>Superficie:</strong> ${turf
-                  .area(geojson)
-                  .toFixed(0)} m²</p>
+                <p><strong>Superficie:</strong> ${turf.area(geojson).toFixed(
+                  0
+                )} m²</p>
               </div>
-            `
-                )
+            `)
                 .openPopup();
               drawnItems.addLayer(layer);
               showToast("Département enregistré!", "success");
@@ -292,14 +371,12 @@
           .join("<br>");
 
         isgbLayer
-          .bindPopup(
-            `
+          .bindPopup(`
           <div class="custom-popup">
             <h5>Coordonnées ISGB</h5>
             <div style="max-height: 200px; overflow-y: auto;">${coords}</div>
           </div>
-        `
-          )
+        `)
           .openPopup();
       }
 
@@ -322,9 +399,7 @@
           </div>`;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 5000);
-        toast
-          .querySelector("button")
-          .addEventListener("click", () => toast.remove());
+        toast.querySelector("button").addEventListener("click", () => toast.remove());
       }
 
       // Démarrer l'application

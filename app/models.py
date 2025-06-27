@@ -7,3 +7,12 @@ class Lieu(models.Model):
 
     def __str__(self):
         return self.name
+    
+
+class Camera(models.Model):
+    name = models.CharField(max_length=100)
+    url = models.URLField()
+    location = models.PointField()
+
+    def __str__(self):
+        return self.name
