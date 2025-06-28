@@ -1,0 +1,145 @@
+{% extends 'admin/main_nav.html' %}
+
+{% load static %}
+
+{% block admin %}
+
+<!-- beautify ignore:start -->
+<html lang="en" class="light-style layout-menu-fixed" dir="ltr" data-theme="theme-default" data-assets-path="../assets/" data-template="vertical-menu-template-free">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"/>
+    <link rel="stylesheet" href="{% static 'css/home.css' %}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&display=swap" rel="stylesheet">
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{% static 'admin/assets/img/favicon/favicon.ico ' %}"  />
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet"/>
+  </head>
+  <style>
+    .blob{
+    width: 500px;
+    height: 460px;
+    background-size: cover;
+    -webkit-background-position: center;
+    background-position: center center;
+    margin: 20px;
+    box-shadow: 0 5px 5px 5px rgba(13, 110, 253, 0.2);
+    animation: animate 5s ease-in-out infinite;
+    transition: all 1s ease-in-out;
+}
+
+@keyframes animate {
+    0%, 100%{
+        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+    }
+    50%{
+        border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+    }
+ }
+.text{
+  font-family: "Rubik", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 450;
+  font-style: normal;
+  font-size: 50px;
+  color:black;
+}
+
+  </style>
+
+  <body>
+  <!-- Search -->
+ <div class="layout-page">
+          <!-- Navbar -->
+
+          <nav class="layout-navbar container-xxl navbar navbar-expand-xl navbar-detached align-items-center bg-navbar-theme" id="layout-navbar">
+            <div class="layout-menu-toggle navbar-nav align-items-xl-center me-3 me-xl-0 d-xl-none">
+              <a class="nav-item nav-link px-0 me-xl-4" href="javascript:void(0)">
+                <i class="bx bx-menu bx-sm"></i>
+              </a>
+            </div>
+
+              <!-- Search -->
+              <!-- /Search -->
+
+              <ul class="navbar-nav flex-row align-items-center ms-auto">
+
+        {%if user.is_authenticated %}
+          <a class="nav-link dropdown-toggle hide-arrow" href="javascript:void(0);" data-bs-toggle="dropdown">
+            {%if user.role == 'admin-Technique' %}
+            <div class="avatar avatar-online">
+              <img src="{% static 'image/admint.jpg' %}" alt class="w-px-40 h-auto rounded-circle" />
+            </div>
+            {% elif user.role == 'admin-Vente' %}
+            <div class="avatar avatar-online">
+              <img src="{% static 'image/admin_t.jpg' %}" alt class="w-px-40 h-auto rounded-circle" />
+            </div>
+            {% else %}
+            <div class="avatar avatar-online">
+              <img src="{% static 'image/livreur.jpg' %}" alt class="w-px-40 h-auto rounded-circle" />
+            </div>
+            {% endif %}
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+              <a class="dropdown-item" href="#">
+                <div class="d-flex">
+                  <div class="flex-grow-1">
+                    <span class="align-middle">{{ user.first_name }} {{ user.last_name }}</span>
+                  </div>
+                </div>
+              </a>
+            </li>
+            <li>
+              <div class="dropdown-divider"></div>
+            </li>
+            <li>
+              <a class="dropdown-item" href="{% url 'logOut' %}">
+                <i class="bx bx-power-off me-2"></i>
+                <span class="align-middle" >Log Out</span>
+              </a>
+            </li>
+     </ul>
+              </ul>
+          </nav>
+          </div>
+
+
+  <div class="text" style="margin-left:23%;">
+      <p style="margin-top:10%;" >Welcome<br>
+      {{ user.first_name }} {{ user.last_name }}</p>
+        {% endif %}
+    </div>
+
+    <div class="shape-container" style="margin-left:60%;margin-top:-18%">
+      <img class='blob' src="{% static 'image/logoo.jpg' %}">
+    </div>
+    <!-- build:js assets/vendor/js/core.js -->
+    <script src="{% static 'admin/assets/vendor/libs/jquery/jquery.js' %}"></script>
+    <script src="{% static 'admin/assets/vendor/libs/popper/popper.js' %}"></script>
+    <script src="{% static 'admin/assets/vendor/js/bootstrap.js' %}"></script>
+    <script src="{% static 'admin/assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.js' %}"></script>
+
+    <script src="{% static 'admin/assets/vendor/js/menu.js' %}"></script>
+    <!-- endbuild -->
+
+    <!-- Vendors JS -->
+    <script src="{% static 'admin/assets/vendor/libs/apex-charts/apexcharts.js' %}"></script>
+
+    <!-- Main JS -->
+    <script src= "{% static 'admin/assets/js/main.js' %}"></script>
+
+    <!-- Page JS -->
+    <script src="{% static 'admin/assets/js/dashboards-analytics.js' %}"></script>
+
+    <!-- Place this tag in your head or just before your close body tag. -->
+    <script async defer src="https://buttons.github.io/buttons.js"></script>
+  </body>
+</html>
+{% endblock  %}

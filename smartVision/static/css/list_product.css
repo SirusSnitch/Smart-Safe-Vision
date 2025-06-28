@@ -1,0 +1,79 @@
+/* Style de base pour la boîte de dialogue */
+        #delete-confirm-dialog {
+            display: none; /* Par défaut, la boîte de dialogue est cachée */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 9999; /* Assurez-vous que la boîte de dialogue est au-dessus de tous les autres éléments */
+        }
+
+        /* Style pour le contenu de la boîte de dialogue */
+        .modal-content {
+            position: absolute;
+            top: 12%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            max-width: 400px; /* Largeur maximale de la boîte de dialogue */
+            width: 90%; /* Largeur de la boîte de dialogue */
+        }
+
+        /* Style pour le bouton de fermeture */
+        .close {
+            position: absolute;
+            top: 9px;
+            right: 10px;
+            cursor: pointer;
+            color: #6c757d;
+        }
+
+        /* Style pour le bouton de confirmation */
+        #confirm-delete {
+            background-color: #6c757d;
+            color: #fff;
+            padding: 9px 9px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* Style pour le bouton d'annulation */
+        #cancel-delete {
+            background-color: #6c757d;
+            color: #fff;
+            padding: 9px 11px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .delete-button {
+            background-color: #D19C97; /* Couleur de fond */
+            color: #ffffff; /* Couleur du texte */
+            border: 1px solid #D19C97; /* Bordure */
+            border-radius: 4px; /* Bordure arrondie */
+            padding: 6px 12px; /* Espacement intérieur */
+            font-size: 14px; /* Taille de la police */
+            cursor: pointer; /* Curseur de souris */
+        }
+
+        .delete-button:hover {
+            background-color: #D19C97; /* Couleur de fond au survol */
+            border: 1px solid #D19C97; /* Bordure au survol */
+        }
+
+        .btn.btn-primary {
+            background-color: #D19C97; /* Couleur de fond */
+            color: #ffffff; /* Couleur du texte */
+            border: 1px solid #D19C97; /* Bordure */
+            border-radius: 4px; /* Bordure arrondie */
+            padding: 6px 12px; /* Espacement intérieur */
+            font-size: 14px; /* Taille de la police */
+            cursor: pointer; /* Curseur de souris */
+        }

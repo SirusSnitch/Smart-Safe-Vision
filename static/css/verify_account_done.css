@@ -1,0 +1,28 @@
+body{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:80vh;
+}
+
+.content{
+    width: 45vh;
+    height:30vh;
+    display:flex;
+    text-align:center;
+    flex-direction:column;
+    background:#FEF9E7  ;
+    padding:25px;
+    border-radius: 6px;
+    box-shadow: 0px 4px 28px -3px rgba(0,0,0,0.1);
+    padding: 25px 40px;
+}
+
+
+.material-symbols-outlined {
+  font-variation-settings:
+  'FILL' 0,
+  'wght' 700,
+  'GRAD' 0,
+  'opsz' 24
+}
