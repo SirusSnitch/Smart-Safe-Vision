@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import index, save_polygon, get_polygons, save_camera, get_cameras, delete_camera
+from .views import index, save_polygon, get_polygons, save_camera, get_cameras, delete_camera, map_view
 
 
 urlpatterns = [
@@ -9,4 +9,5 @@ urlpatterns = [
     path('save-camera/', save_camera, name='save_camera'),
     path('get-cameras/', get_cameras, name='get_cameras'),
     path('delete-camera/<int:camera_id>/', delete_camera, name='delete_camera'),
+    path('map/', map_view, name='map_view'),
 ]

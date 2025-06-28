@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Carte Visualisation ISGB{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #map {
+        height: 90vh;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="info-panel" style="position: absolute; top: 20px; right: 20px; z-index: 1000; background: white; padding: 15px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.2); width: 300px;">
+  <h4 class="text-center mb-3">Carte ISGB</h4>
+  <div class="legend">
+    <p><i style="background: #3388ff"></i>Zone ISGB</p>
+    <p><i style="background: #ff7800"></i>Départements</p>
+    <p>
+      <img src="https://cdn-icons-png.flaticon.com/512/2409/2409342.png" alt="Caméra" style="width:18px; height:18px; vertical-align:middle; margin-right:8px;">
+      Caméras
+    </p>
+  </div>
+</div>
+
+<div id="map"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const map = L.map('map');
+    
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 22,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // Load ISGB polygon and center the map on it
+    fetch("{% static 'data/isgb.geojson' %}")
+        .then(response => response.json())
+        .then(data => {
+            const isgbLayer = L.geoJSON(data, {
+                style: {
+                    color: "#3388ff",
+                    weight: 4,
+                    opacity: 1,
+                    fillColor: "#3388ff",
+                    fillOpacity: 0.2,
+                    dashArray: "5, 5",
+                }
+            }).addTo(map);
+
+            // Center map on ISGB polygon
+            map.fitBounds(isgbLayer.getBounds(), {
+                padding: [20, 20],
+                maxZoom: 18
+            });
+        });
+
+    // Load departments
+    fetch("{% url 'get_polygons' %}")
+        .then(response => response.json())
+        .then(data => {
+            L.geoJSON(data, {
+                style: {
+                    color: "#ff7800",
+                    weight: 3,
+                    opacity: 1,
+                    fillColor: "#ff7800",
+                    fillOpacity: 0.4,
+                },
+                onEachFeature: (feature, layer) => {
+                    if (feature.properties?.name) {
+                        layer.bindPopup(`<b>${feature.properties.name}</b>`);
+                    }
+                }
+            }).addTo(map);
+        });
+
+    // Load cameras
+    fetch("{% url 'get_cameras' %}")
+        .then(response => response.json())
+        .then(data => {
+            data.features.forEach(feature => {
+                const coords = feature.geometry.coordinates;
+                const props = feature.properties;
+                const marker = L.marker([coords[1], coords[0]], {
+                    icon: L.icon({
+                        iconUrl: "https://cdn-icons-png.flaticon.com/512/709/709592.png",
+                        iconSize: [16, 16],
+                        iconAnchor: [8, 16],
+                        popupAnchor: [0, -16],
+                    })
+                }).addTo(map);
+                marker.bindPopup(`<b>${props.name}</b><br><a href="${props.url}" target="_blank">Voir caméra</a>`);
+            });
+        });
+});
+</script>
+{% endblock %}

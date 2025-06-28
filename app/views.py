@@ -100,3 +100,7 @@ def delete_camera(request, camera_id):
             return JsonResponse({'error': 'Camera not found'}, status=404)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+
+def map_view(request):
+    return render(request, 'map.html')
+
