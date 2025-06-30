@@ -1,255 +1,568 @@
-// Fonction utilitaire pour afficher un toast avec Toastify
-function showToast(message, type = "info") {
-  let bgColor = "#007bff"; // bleu info par défaut
-  if (type === "success") bgColor = "#28a745"; // vert
-  else if (type === "error") bgColor = "#dc3545"; // rouge
-  else if (type === "warning") bgColor = "#ffc107"; // jaune
+// Fonction d'initialisation principale
+function initMap(urlConfig) {
+  const saveDeptBtn = document.getElementById("save-dept-btn");
 
-  Toastify({
-    text: message,
-    duration: 4000,
-    close: true,
-    gravity: "top",
-    position: "right",
-    backgroundColor: bgColor,
-  }).showToast();
-}
+  // Fonction utilitaire pour afficher un toast avec Toastify
+  function showToast(message, type = "info") {
+    let bgColor = "#3498db"; // bleu
+    if (type === "success") bgColor = "#27ae60"; // vert
+    else if (type === "error") bgColor = "#e74c3c"; // rouge
+    else if (type === "warning") bgColor = "#f39c12"; // jaune
 
-// Initialisation de la carte
-const map = L.map("map").setView([37.2367, 9.8815], 18);
-
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-}).addTo(map);
-
-L.control.scale({ position: "bottomleft", metric: true }).addTo(map);
-
-// Polygone ISGB
-const isgbPolygonGeoJSON = {
-  type: "Feature",
-  geometry: {
-    type: "Polygon",
-    coordinates: [
-      [
-        [9.882540055582894, 37.23716617665191],
-        [9.880526669259268, 37.236722457011595],
-        [9.88096557354379, 37.23552994753754],
-        [9.882756024356922, 37.235901568792],
-        [9.882978959867387, 37.236140071020344],
-        [9.882547022316487, 37.2371606301723],
-        [9.882540055582894, 37.23716617665191],
-      ],
-    ],
-  },
-  properties: {
-    name: "ISGB",
-  },
-};
-
-L.geoJSON(isgbPolygonGeoJSON, {
-  style: { color: "blue", weight: 3, fillOpacity: 0.3 },
-}).addTo(map);
-
-const drawnItems = new L.FeatureGroup();
-map.addLayer(drawnItems);
-
-const drawControl = new L.Control.Draw({
-  position: "topleft",
-  draw: {
-    polygon: {
-      allowIntersection: false,
-      shapeOptions: {
-        color: "#ff7800",
-        weight: 3,
-        fillOpacity: 0.4,
+    Toastify({
+      text: message,
+      duration: 4000,
+      close: true,
+      gravity: "top",
+      position: "right",
+      backgroundColor: bgColor,
+      style: {
+        fontWeight: 500,
+        fontSize: "0.95rem",
       },
-      showArea: true,
-    },
-    marker: false,
-    polyline: false,
-    rectangle: false,
-    circle: false,
-    circlemarker: false,
-  },
-  edit: {
-    featureGroup: drawnItems,
-    remove: true,
-  },
-});
-map.addControl(drawControl);
-
-// Événement création polygone
-map.on(L.Draw.Event.CREATED, function (event) {
-  const layer = event.layer;
-  const geojson = layer.toGeoJSON();
-
-  const isInside = turf.booleanWithin(geojson, isgbPolygonGeoJSON);
-
-  if (!isInside) {
-    showToast("Zone en dehors du périmètre ISGB !", "error");
-    return;
+    }).showToast();
   }
 
-  Swal.fire({
-    title: "Nom du département",
-    input: "text",
-    inputPlaceholder: "Entrez le nom du département",
-    showCancelButton: true,
-  }).then((result) => {
-    if (result.isConfirmed && result.value) {
-      const name = result.value;
-      const area = (turf.area(geojson) / 10000).toFixed(2); // ha
+  // Initialisation de la carte
+  const map = L.map("map").setView([37.2367, 9.8815], 18);
 
-      const feature = {
-        type: "Feature",
-        properties: { name, area },
-        geometry: geojson.geometry,
-      };
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(map);
 
-      savePolygon(feature).then((id) => {
-        if (id) {
-          feature.id = id;
-          layer.feature = feature;
-          layer.bindPopup(`<h4>${name}</h4><p>Superficie : ${area} ha</p>`);
-          drawnItems.addLayer(layer);
-          showToast("Polygone ajouté avec succès", "success");
-        }
-      });
-    }
-  });
-});
+  L.control.scale({ position: "bottomleft", metric: true }).addTo(map);
 
-// Événement édition
-map.on(L.Draw.Event.EDITED, function (e) {
-  e.layers.eachLayer((layer) => {
-    const geojson = layer.toGeoJSON();
-    const area = (turf.area(geojson) / 10000).toFixed(2);
-    const feature = layer.feature;
+  // Polygone ISGB
+  const isgbPolygonGeoJSON = {
+    type: "Feature",
+    geometry: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [9.882540055582894, 37.23716617665191],
+          [9.880526669259268, 37.236722457011595],
+          [9.88096557354379, 37.23552994753754],
+          [9.882756024356922, 37.235901568792],
+          [9.882978959867387, 37.236140071020344],
+          [9.882547022316487, 37.2371606301723],
+          [9.882540055582894, 37.23716617665191],
+        ],
+      ],
+    },
+    properties: {
+      name: "ISGB",
+    },
+  };
 
-    feature.properties.area = area;
-    feature.geometry = geojson.geometry;
+  const isgbPolygon = L.geoJSON(isgbPolygonGeoJSON, {
+    style: {
+      color: "blue",
+      weight: 3,
+      fillOpacity: 0.3,
+      fillColor: "blue",
+    },
+  }).addTo(map);
 
-    updatePolygon(feature).then(() => {
-      layer.setPopupContent(
-        `<h4>${feature.properties.name}</h4><p>Superficie : ${area} ha</p>`
-      );
-      showToast("Polygone modifié avec succès", "success");
-    });
-  });
-});
+  // Calcul de la surface totale de l'ISGB
+  const isgbArea = turf.area(isgbPolygonGeoJSON) / 10000; // en hectares
 
-// Événement suppression
-map.on(L.Draw.Event.DELETED, function (e) {
-  e.layers.eachLayer((layer) => {
-    const feature = layer.feature;
-    if (feature && feature.id) {
-      deletePolygon(feature.id).then((success) => {
-        if (success) {
-          drawnItems.removeLayer(layer);
-          showToast("Polygone supprimé avec succès", "success");
-        } else {
-          showToast("Erreur lors de la suppression", "error");
-        }
-      });
-    }
-  });
-});
+  // Éléments UI
+  const deptList = document.getElementById("dept-list");
+  const newDeptBtn = document.getElementById("new-dept-btn");
+  const sidebar = document.getElementById("sidebar");
+  const sidebarToggle = document.getElementById("sidebarToggle");
+  const sidebarToggleMobile = document.getElementById("sidebarToggleMobile");
+  const legend = document.getElementById("legend");
+  const legendToggle = legend.querySelector(".legend-toggle");
 
-// Chargement polygones existants
-function loadPolygons() {
-  fetch("/get-polygons/")
-    .then((res) => res.json())
-    .then((data) => {
-      L.geoJSON(data, {
-        style: {
+  // Variables globales
+  let totalArea = 0;
+  let deptCount = 0;
+  let drawnItems = new L.FeatureGroup();
+  map.addLayer(drawnItems);
+  let pendingLayer = null;
+
+  // Configuration du contrôle de dessin
+  const drawControl = new L.Control.Draw({
+    position: "topleft",
+    draw: {
+      polygon: {
+        allowIntersection: false,
+        shapeOptions: {
           color: "#ff7800",
           weight: 3,
           fillOpacity: 0.4,
         },
-        onEachFeature: (feature, layer) => {
-          if (feature.properties?.name) {
-            layer.bindPopup(
-              `<h4>${feature.properties.name}</h4><p>Superficie : ${
-                feature.properties.area || "?"
-              } ha</p>`
-            );
+        showArea: true,
+      },
+      marker: false,
+      polyline: false,
+      rectangle: false,
+      circle: false,
+      circlemarker: false,
+    },
+    edit: {
+      featureGroup: drawnItems,
+      remove: true,
+    },
+  });
+  map.addControl(drawControl);
+
+  // Événements UI
+  newDeptBtn.addEventListener("click", () => {
+    drawControl._toolbars.draw._modes.polygon.handler.enable();
+    showToast(
+      "Commencez à dessiner un nouveau département sur la carte",
+      "info"
+    );
+    // Affiche le bouton Enregistrer
+    saveDeptBtn.style.display = "inline-flex";
+  });
+
+  sidebarToggle.addEventListener("click", () => {
+    sidebar.classList.toggle("active");
+  });
+
+  sidebarToggleMobile.addEventListener("click", () => {
+    sidebar.classList.toggle("active");
+  });
+
+  legendToggle.addEventListener("click", () => {
+    legend.classList.toggle("collapsed");
+  });
+
+  // Événement création polygone
+  map.on(L.Draw.Event.CREATED, function (event) {
+    const layer = event.layer;
+    const geojson = layer.toGeoJSON();
+
+    const isInside = turf.booleanWithin(geojson, isgbPolygonGeoJSON);
+
+    if (!isInside) {
+      showToast("Zone en dehors du périmètre ISGB !", "error");
+      return;
+    }
+
+    // Stocke le layer en attente
+    pendingLayer = layer;
+    showToast(
+      "Département dessiné. Cliquez sur 'Enregistrer' pour le valider.",
+      "info"
+    );
+  });
+
+  // ✅ 6. Ici tu ajoutes ton code de gestion du bouton "Enregistrer"
+  saveDeptBtn.addEventListener("click", () => {
+    const polygonDrawer = drawControl._toolbars.draw._modes.polygon.handler;
+
+    // Si on est en train de dessiner, on force la fin du dessin
+    if (polygonDrawer._drawing) {
+      polygonDrawer.completeShape(); // Termine le dessin (équivalent de "Finish")
+      polygonDrawer.disable(); // Désactive le mode dessin
+    }
+
+    // Maintenant pendingLayer devrait être défini grâce à l'événement CREATED déclenché
+    if (!pendingLayer) {
+      showToast("Aucun département à enregistrer", "warning");
+      return;
+    }
+
+    Swal.fire({
+      title: "Nom du département",
+      input: "text",
+      inputPlaceholder: "Entrez le nom du département",
+      showCancelButton: true,
+      confirmButtonText: "Enregistrer",
+      cancelButtonText: "Annuler",
+      inputValidator: (value) => {
+        if (!value) return "Le nom est obligatoire !";
+      },
+    }).then((result) => {
+      if (result.isConfirmed && result.value) {
+        const name = result.value;
+        const geojson = pendingLayer.toGeoJSON();
+        const area = (turf.area(geojson) / 10000).toFixed(2);
+
+        const feature = {
+          type: "Feature",
+          properties: { name, area },
+          geometry: geojson.geometry,
+        };
+
+        savePolygon(feature).then((id) => {
+          if (id) {
+            feature.id = id;
+            pendingLayer.feature = feature;
+            pendingLayer.bindPopup(createPopupContent(feature));
+            drawnItems.addLayer(pendingLayer);
+            addDeptToSidebar(feature);
+            updateStats(parseFloat(area), 1);
+            showToast("Département ajouté avec succès", "success");
+
+            pendingLayer = null;
+            saveDeptBtn.style.display = "none";
           }
-          layer.feature = { ...feature, id: feature.id };
-          drawnItems.addLayer(layer);
-        },
+        });
+      }
+    });
+  });
+
+  // Événement édition
+  map.on(L.Draw.Event.EDITED, function (e) {
+    e.layers.eachLayer((layer) => {
+      const geojson = layer.toGeoJSON();
+      const area = (turf.area(geojson) / 10000).toFixed(2); // surface en ha
+      const feature = layer.feature;
+
+      // Met à jour la géométrie et l'aire
+      feature.geometry = geojson.geometry;
+      feature.properties.area = area;
+
+      // Demande de nouveau nom via SweetAlert2 (ou prompt simple)
+      Swal.fire({
+        title: "Nouveau nom du département",
+        input: "text",
+        inputValue: feature.properties.name,
+        showCancelButton: true,
+        confirmButtonText: "Enregistrer",
+        cancelButtonText: "Annuler",
+      }).then((result) => {
+        if (result.isConfirmed && result.value) {
+          feature.properties.name = result.value;
+          updateDeptInSidebar(feature); // <-- Mise à jour immédiate côté UI
+
+          // Enregistre les modifications
+          updatePolygon(feature).then(() => {
+            layer.setPopupContent(createPopupContent(feature));
+            updateDeptInSidebar(feature);
+            updateStats(area, 0);
+            showToast("Département modifié avec succès", "success");
+          });
+        } else {
+          showToast("Modification annulée", "warning");
+        }
       });
+    });
+  });
+
+  // Événement suppression
+  map.on(L.Draw.Event.DELETED, function (e) {
+    e.layers.eachLayer((layer) => {
+      const feature = layer.feature;
+      if (feature && feature.id) {
+        deletePolygon(feature.id).then((success) => {
+          if (success) {
+            drawnItems.removeLayer(layer);
+            removeDeptFromSidebar(feature.id);
+            updateStats(-parseFloat(feature.properties.area), -1);
+            showToast("Département supprimé avec succès", "success");
+          } else {
+            showToast("Erreur lors de la suppression", "error");
+          }
+        });
+      }
+    });
+  });
+
+  // Créer le contenu du popup
+  function createPopupContent(feature) {
+    return `<div class="popup-content">
+                <h4>${feature.properties.name}</h4>
+                <p><i class="fas fa-ruler-combined"></i> Superficie: ${feature.properties.area} ha</p>
+                <div class="popup-actions">
+                    <button class="btn edit-btn"><i class="fas fa-edit"></i> Modifier</button>
+                    <button class="btn delete-btn"><i class="fas fa-trash"></i> Supprimer</button>
+                </div>
+            </div>`;
+  }
+
+  // Ajouter un département à la sidebar
+  function addDeptToSidebar(feature) {
+    const deptItem = document.createElement("div");
+    deptItem.className = "dept-item";
+    deptItem.dataset.id = feature.id;
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString();
+
+    deptItem.innerHTML = `
+                <div class="dept-header">
+                    <div class="dept-name">${feature.properties.name}</div>
+                    <div class="dept-area">${feature.properties.area} ha</div>
+                </div>
+                <div class="dept-meta">
+                    <span>Créé: ${dateStr}</span>
+                    <span>Modifié: ${dateStr}</span>
+                </div>
+            `;
+
+    deptItem.addEventListener("click", () => {
+      // Centrer la carte sur le polygone et ouvrir le popup
+      const layer = findLayerById(feature.id);
+      if (layer) {
+        map.fitBounds(layer.getBounds());
+        layer.openPopup();
+      }
+    });
+
+    deptList.appendChild(deptItem);
+  }
+
+  // Mettre à jour un département dans la sidebar
+  function updateDeptInSidebar(feature) {
+    const deptItem = document.querySelector(
+      `.dept-item[data-id="${feature.id}"]`
+    );
+    if (deptItem) {
+      const nameEl = deptItem.querySelector(".dept-name");
+      const areaEl = deptItem.querySelector(".dept-area");
+      const modifiedEl = deptItem.querySelector(".dept-meta span:last-child");
+
+      if (nameEl) nameEl.textContent = feature.properties.name;
+      if (areaEl) areaEl.textContent = `${feature.properties.area} ha`;
+      if (modifiedEl)
+        modifiedEl.textContent = `Modifié: ${new Date().toLocaleDateString()}`;
+    }
+  }
+
+  // Supprimer un département de la sidebar
+  function removeDeptFromSidebar(id) {
+    const deptItem = document.querySelector(`.dept-item[data-id="${id}"]`);
+    if (deptItem) {
+      deptItem.remove();
+    }
+  }
+
+  // Trouver un layer par son ID
+  function findLayerById(id) {
+    let targetLayer = null;
+    drawnItems.eachLayer((layer) => {
+      if (layer.feature && layer.feature.id === id) {
+        targetLayer = layer;
+      }
+    });
+    return targetLayer;
+  }
+
+  // Mettre à jour les statistiques
+  function updateStats(areaChange, countChange) {
+    totalArea = parseFloat((totalArea + areaChange).toFixed(2));
+    deptCount += countChange;
+
+    const coverage =
+      totalArea > 0
+        ? Math.min(100, Math.round((totalArea / isgbArea) * 100))
+        : 0;
+
+    document.getElementById("dept-count").textContent = deptCount;
+    document.getElementById("total-area").textContent = `${totalArea} ha`;
+    document.getElementById("coverage").textContent = `${coverage}%`;
+  }
+
+  // Chargement polygones existants
+  function loadPolygons() {
+    fetch(urlConfig.getPolygons)
+      .then((res) => res.json())
+      .then((data) => {
+        // Calculer les stats initiales
+        totalArea = 0;
+        deptCount = data.features.length;
+
+        data.features.forEach((feature) => {
+          totalArea += parseFloat(feature.properties.area);
+          addDeptToSidebar(feature);
+        });
+
+        updateStats(0, 0);
+
+        // Ajouter les polygones à la carte
+        L.geoJSON(data, {
+          style: {
+            color: "#ff7800",
+            weight: 3,
+            fillOpacity: 0.4,
+          },
+          onEachFeature: (feature, layer) => {
+            layer.bindPopup(createPopupContent(feature));
+            layer.feature = { ...feature, id: feature.id };
+            drawnItems.addLayer(layer);
+          },
+        });
+      })
+      .catch((err) => {
+        console.error("Erreur de chargement :", err);
+        showToast("Erreur lors du chargement des départements", "error");
+      });
+  }
+
+  // Sauvegarder un polygone
+  function savePolygon(feature) {
+    return fetch(urlConfig.savePolygon, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+      body: JSON.stringify({
+        name: feature.properties.name,
+        area: feature.properties.area,
+        geometry: feature.geometry,
+      }),
     })
-    .catch((err) => {
-      console.error("Erreur de chargement :", err);
-      showToast("Erreur lors du chargement des polygones", "error");
-    });
-}
+      .then((res) => res.json())
+      .then((data) => data.id)
+      .catch((err) => {
+        console.error("Erreur ajout :", err);
+        showToast("Erreur lors de l'ajout du département", "error");
+        return null;
+      });
+  }
 
-// Sauvegarder un polygone
-function savePolygon(feature) {
-  return fetch("/save-polygon/", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": getCookie("csrftoken"),
-    },
-    body: JSON.stringify({
-      name: feature.properties.name,
-      area: feature.properties.area,
-      geometry: feature.geometry,
-    }),
-  })
-    .then((res) => res.json())
-    .then((data) => data.id)
-    .catch((err) => {
-      console.error("Erreur ajout :", err);
-      showToast("Erreur lors de l'ajout", "error");
-      return null;
+  // Mettre à jour un polygone
+  function updatePolygon(feature) {
+    return fetch(urlConfig.savePolygon, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+      body: JSON.stringify({
+        id: feature.id,
+        name: feature.properties.name,
+        area: feature.properties.area,
+        geometry: feature.geometry,
+      }),
+    }).catch((err) => {
+      console.error("Erreur modification :", err);
+      showToast("Erreur lors de la modification du département", "error");
     });
-}
+  }
 
-// Mettre à jour un polygone
-function updatePolygon(feature) {
-  return fetch("/save-polygon/", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": getCookie("csrftoken"),
-    },
-    body: JSON.stringify({
-      id: feature.id,
-      name: feature.properties.name,
-      area: feature.properties.area,
-      geometry: feature.geometry,
-    }),
-  }).catch((err) => {
-    console.error("Erreur modification :", err);
-    showToast("Erreur lors de la modification", "error");
+  // Supprimer un polygone
+  function deletePolygon(id) {
+    return fetch(urlConfig.deletePolygon(id), {
+      method: "DELETE",
+      headers: {
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+    })
+      .then((res) => res.ok)
+      .catch((err) => {
+        console.error("Erreur suppression :", err);
+        showToast("Erreur lors de la suppression du département", "error");
+        return false;
+      });
+  }
+
+  // Récupérer le cookie CSRF (Django)
+  function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(";").shift();
+  }
+
+  // Initialisation
+  loadPolygons();
+
+  // Gestion des clics sur les boutons dans les popups - CORRIGÉ
+  map.on("popupopen", (e) => {
+    const popup = e.popup;
+    const content = popup.getElement();
+    const layer = e.popup._source;
+
+    content.addEventListener("click", function (e) {
+      // Gérer le bouton Modifier
+      if (e.target.closest(".edit-btn")) {
+        e.stopPropagation();
+        popup.remove(); // ❌ ferme le popup
+
+        layer.editing?.enable?.(); // ✅ active mode édition
+
+        showToast("Modifiez la forme, puis cliquez sur 'Enregistrer'", "info");
+
+        // Créer bouton enregistrer
+        const saveBtn = L.DomUtil.create("button", "leaflet-bar save-edit-btn");
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> Enregistrer';
+        saveBtn.style.position = "absolute";
+        saveBtn.style.top = "100px";
+        saveBtn.style.left = "10px";
+        saveBtn.style.zIndex = "1001";
+        saveBtn.style.background = "#27ae60";
+        saveBtn.style.color = "white";
+        saveBtn.style.padding = "8px 12px";
+        saveBtn.style.border = "none";
+        saveBtn.style.borderRadius = "6px";
+        saveBtn.style.cursor = "pointer";
+        saveBtn.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)";
+        saveBtn.style.fontWeight = "600";
+
+        document.body.appendChild(saveBtn);
+
+        // Au clic sur Enregistrer
+        saveBtn.addEventListener("click", () => {
+          layer.editing?.disable?.(); // désactive le mode édition
+
+          const geojson = layer.toGeoJSON();
+          const area = (turf.area(geojson) / 10000).toFixed(2); // ha
+          const feature = layer.feature;
+
+          feature.geometry = geojson.geometry;
+          feature.properties.area = area;
+
+          Swal.fire({
+            title: "Nouveau nom du département",
+            input: "text",
+            inputValue: feature.properties.name,
+            showCancelButton: true,
+            confirmButtonText: "Enregistrer",
+            cancelButtonText: "Annuler",
+          }).then((result) => {
+            if (result.isConfirmed && result.value) {
+              feature.properties.name = result.value;
+
+              updatePolygon(feature).then(() => {
+                layer.bindPopup(createPopupContent(feature)); // remettre popup
+                updateDeptInSidebar(feature);
+                updateStats(0, 0);
+                showToast("Modifications enregistrées", "success");
+              });
+            } else {
+              showToast("Modification annulée", "warning");
+            }
+          });
+
+          saveBtn.remove(); // Supprimer le bouton
+        });
+      }
+
+      // Gérer le bouton Supprimer
+      if (e.target.closest(".delete-btn")) {
+        e.stopPropagation();
+        const id = layer.feature.id;
+
+        Swal.fire({
+          title: "Confirmer la suppression",
+          text: "Êtes-vous sûr de vouloir supprimer ce département ?",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#e74c3c",
+          confirmButtonText: "Oui, supprimer",
+          cancelButtonText: "Annuler",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            drawnItems.removeLayer(layer);
+            deletePolygon(id).then((success) => {
+              if (success) {
+                removeDeptFromSidebar(id);
+                updateStats(-parseFloat(layer.feature.properties.area), -1);
+                showToast("Département supprimé", "success");
+              }
+            });
+          }
+        });
+      }
+    });
   });
 }
-
-// Supprimer un polygone
-function deletePolygon(id) {
-  return fetch(`/delete-polygon/${id}/`, {
-    method: "DELETE",
-    headers: {
-      "X-CSRFToken": getCookie("csrftoken"),
-    },
-  })
-    .then((res) => res.ok)
-    .catch((err) => {
-      console.error("Erreur suppression :", err);
-      showToast("Erreur lors de la suppression", "error");
-      return false;
-    });
-}
-
-// Récupérer le cookie CSRF (Django)
-function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(";").shift();
-}
-
-// Initialisation
-loadPolygons();
