@@ -1,5 +1,5 @@
 from django.urls import path
-from authentification.views.admin.authAdmin import *
+from authentification.views.authAdmin import *
 
 urlpatterns = [
 

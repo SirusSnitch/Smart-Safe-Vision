@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <!-- Affichage des messages -->
+    {% if messages %}
+    <div class="mb-6">
+        {% for message in messages %}
+        <div class="px-4 py-3 rounded relative {% if message.tags == 'success' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-xl shadow-md overflow-hidden">
+        <!-- En-tête de la carte -->
+        <div class="bg-blue-600 px-6 py-4">
+            <h2 class="text-2xl font-bold text-white text-center">Création d'un nouvel agent</h2>
+        </div>
+
+        <!-- Corps de la carte -->
+        <div class="p-6">
+            <form method="post" novalidate class="space-y-6">
+                {% csrf_token %}
+
+                <!-- Affichage des erreurs non-field -->
+                {% if form.non_field_errors %}
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
+                    {% for error in form.non_field_errors %}
+                    <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Champ CIN -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                    <label for="{{ form.cin.id_for_label }}" class="md:col-span-1 font-medium text-gray-700">
+                        CIN <span class="text-red-500">*</span>
+                    </label>
+                    <div class="md:col-span-3">
+                        <input type="text"
+                               name="{{ form.cin.name }}"
+                               id="{{ form.cin.id_for_label }}"
+                               class="w-full px-3 py-2 border rounded-md {% if form.cin.errors %}border-red-500{% else %}border-gray-300{% endif %}"
+                               value="{{ form.cin.value|default_if_none:'' }}"
+                               pattern="[0-9]{8}"
+                               title="Le CIN doit contenir exactement 8 chiffres"
+                               required>
+                        {% for error in form.cin.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ error }}</p>
+                        {% endfor %}
+                        <p class="mt-1 text-sm text-gray-500">Doit contenir exactement 8 chiffres</p>
+                    </div>
+                </div>
+
+                <!-- Champ Email -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                    <label for="{{ form.email.id_for_label }}" class="md:col-span-1 font-medium text-gray-700">
+                        Email (identifiant) <span class="text-red-500">*</span>
+                    </label>
+                    <div class="md:col-span-3">
+                        <input type="email"
+                               name="{{ form.email.name }}"
+                               id="{{ form.email.id_for_label }}"
+                               class="w-full px-3 py-2 border rounded-md {% if form.email.errors %}border-red-500{% else %}border-gray-300{% endif %}"
+                               value="{{ form.email.value|default_if_none:'' }}"
+                               required>
+                        {% for error in form.email.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Champ Prénom -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                    <label for="{{ form.first_name.id_for_label }}" class="md:col-span-1 font-medium text-gray-700">
+                        Prénom
+                    </label>
+                    <div class="md:col-span-3">
+                        <input type="text"
+                               name="{{ form.first_name.name }}"
+                               id="{{ form.first_name.id_for_label }}"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                               value="{{ form.first_name.value|default_if_none:'' }}">
+                        {% for error in form.first_name.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Champ Nom -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                    <label for="{{ form.last_name.id_for_label }}" class="md:col-span-1 font-medium text-gray-700">
+                        Nom
+                    </label>
+                    <div class="md:col-span-3">
+                        <input type="text"
+                               name="{{ form.last_name.name }}"
+                               id="{{ form.last_name.id_for_label }}"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                               value="{{ form.last_name.value|default_if_none:'' }}">
+                        {% for error in form.last_name.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Champ Téléphone -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                    <label for="{{ form.phone.id_for_label }}" class="md:col-span-1 font-medium text-gray-700">
+                        Téléphone
+                    </label>
+                    <div class="md:col-span-3">
+                        <input type="tel"
+                               name="{{ form.phone.name }}"
+                               id="{{ form.phone.id_for_label }}"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                               value="{{ form.phone.value|default_if_none:'' }}">
+                        {% for error in form.phone.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Boutons -->
+                <div class="flex justify-end space-x-4 pt-4">
+                    <a href="{% url 'liste_agents' %}" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">
+                        <i class="fas fa-times mr-2"></i>Annuler
+                    </a>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-save mr-2"></i>Enregistrer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

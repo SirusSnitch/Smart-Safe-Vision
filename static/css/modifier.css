@@ -1,0 +1,26 @@
+    /* Amélioration de la visibilité des bordures */
+    input {
+        border-width: 1.5px;
+    }
+
+    /* Contraste amélioré pour le texte */
+    .text-gray-700 {
+        color: #374151;
+    }
+
+    /* Espacement entre les icônes et le texte */
+    .material-symbols-outlined {
+        margin-right: 8px;
+    }
+
+    /* Effet de focus plus visible */
+    input:focus {
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    /* Largeur maximale plus grande pour le formulaire */
+    @media (min-width: 640px) {
+        .max-w-2xl {
+            max-width: 42rem;
+        }
+    }
