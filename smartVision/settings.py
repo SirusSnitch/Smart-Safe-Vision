@@ -11,6 +11,11 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from urllib.parse import urlparse, parse_qsl, unquote
+from dotenv import load_dotenv
+
+load_dotenv()  # Charger les variables depuis .env
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,7 +42,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'app'
+    'app',
+    'rest_framework',
+    'rest_framework_gis',
+    
 ]
 
 MIDDLEWARE = [
@@ -55,7 +63,7 @@ ROOT_URLCONF = 'smartVision.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'app/templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -74,10 +82,17 @@ WSGI_APPLICATION = 'smartVision.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+tmpPostgres = urlparse(os.getenv("DATABASE_URL"))
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',
+        'NAME': unquote(tmpPostgres.path[1:]),
+        'USER': unquote(tmpPostgres.username),
+        'PASSWORD': tmpPostgres.password,
+        'HOST': tmpPostgres.hostname,
+        'PORT': tmpPostgres.port or 5432,
+        'OPTIONS': dict(parse_qsl(tmpPostgres.query)),
     }
 }
 
@@ -122,3 +137,5 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+GDAL_LIBRARY_PATH = r"C:\OSGeo4W\bin\gdal311.dll"
+GEOS_LIBRARY_PATH = r"C:\OSGeo4W\bin\geos_c.dll"
