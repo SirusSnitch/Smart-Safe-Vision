@@ -1,6 +1,82 @@
 
 {% load static %}
+<style>
 
+  /* Centrage et style de l'avatar principal dans la navbar */
+.navbar-nav .dropdown-user .avatar-online {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto;
+}
+
+/* Taille de l'image avatar principale */
+.navbar-nav .dropdown-user .avatar-online img {
+    width: 40px;        /* Ajustez selon vos besoins */
+    height: 40px;       /* Ajustez selon vos besoins */
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid #fff; /* Optionnel - bordure blanche */
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+/* Style du dropdown menu */
+.dropdown-menu.dropdown-menu-end {
+    min-width: 220px;
+    border: none;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    border-radius: 8px;
+}
+
+/* Style de l'avatar dans le dropdown */
+.dropdown-menu .avatar-online img {
+    width: 50px;        /* Légèrement plus grand dans le menu */
+    height: 50px;
+}
+
+/* Alignement des éléments du dropdown */
+.dropdown-menu .d-flex {
+    align-items: center;
+    padding: 8px 16px;
+}
+
+/* Style du nom d'utilisateur */
+.dropdown-menu .fw-semibold {
+    font-size: 1rem;
+    color: #333;
+}
+
+/* Style du rôle */
+.dropdown-menu .text-muted {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+/* Style des items du menu */
+.dropdown-menu .dropdown-item {
+    padding: 8px 16px;
+    color: #444;
+    transition: all 0.3s ease;
+}
+
+.dropdown-menu .dropdown-item:hover {
+    background-color: #f8f9fa;
+    color: #0d6efd;
+}
+
+/* Icônes dans le menu */
+.dropdown-menu .bx {
+    font-size: 1.2rem;
+    vertical-align: middle;
+    margin-right: -80px;
+}
+
+/* Divider */
+.dropdown-divider {
+    margin: 0.5rem 0;
+    border-color: #eee;
+}
+</style>
 <div class="layout-page">
           <!-- Navbar -->
 

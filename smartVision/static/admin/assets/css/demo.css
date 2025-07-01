@@ -144,3 +144,21 @@
   text-decoration: none;
   cursor: pointer;
 }
+/* Supprimer les marges/paddings existants */
+.layout-navbar-fixed .layout-wrapper .layout-page {
+  padding-top: 0 !important;
+}
+
+/* Ajustement spécifique pour le menu */
+.layout-menu {
+  top: 0;
+  margin-top: 0;
+}
+
+/* Si vous utilisez une navbar fixe */
+.navbar-fixed {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+}

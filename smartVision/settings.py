@@ -55,7 +55,8 @@ ROOT_URLCONF = 'smartVision.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [  os.path.join(BASE_DIR, 'templates'),  # Dossier global
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -135,3 +136,13 @@ MEDIA_URL = '/media/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+#email
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'  # Pour Outlook/Office 365
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'dridi.nourchenee@gmail.com'  # Votre adresse Hotmail
+EMAIL_SENDER = "dridi.nourchenee@gmail.com"
+EMAIL_HOST_PASSWORD = 'cgev gbwc hugo bxtz'
