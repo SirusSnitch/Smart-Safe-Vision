@@ -275,6 +275,7 @@ function initMap(urlConfig) {
                     <button class="btn edit-btn"><i class="fas fa-edit"></i> Modifier</button>
                     <button class="btn delete-btn"><i class="fas fa-trash"></i> Supprimer</button>
                 </div>
+                
             </div>`;
   }
 

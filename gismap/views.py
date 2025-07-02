@@ -9,6 +9,8 @@ from django.conf import settings
 import traceback
 from django.views.decorators.http import require_http_methods
 from django.core.serializers import serialize
+from django.contrib.gis.serializers import geojson  # ajoute ceci
+
 
 
 def index(request):
@@ -63,12 +65,16 @@ def save_polygon(request):
 def get_polygons(request):
     lieux = Lieu.objects.all()
     if lieux.exists():
-        geojson = serialize('geojson', lieux, geometry_field='polygon', fields=('name', 'area'))
-        # serialize renvoie une chaîne JSON, on doit la convertir en dict pour JsonResponse
-        import json
-        geojson_dict = json.loads(geojson)
+        geojson_data = geojson.Serializer().serialize(
+            lieux,
+            use_natural_primary_keys=False,
+            geometry_field='polygon',
+            fields=('name', 'area')
+        )
+        geojson_dict = json.loads(geojson_data)
     else:
         geojson_dict = {"type": "FeatureCollection", "features": []}
+    
     return JsonResponse(geojson_dict)
 
 
