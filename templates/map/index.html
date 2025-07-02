@@ -90,7 +90,6 @@
         <div class="camera-list" id="camera-list">
           <!-- Cameras will be dynamically loaded here -->
         </div>
-
       </div>
 
       <!-- Map Container -->
@@ -151,7 +150,8 @@
         getPolygons: "{% url 'get_polygons' %}",
         savePolygon: "{% url 'save_polygon' %}",
         deletePolygon: (id) => `{% url 'delete_polygon' 0 %}`.replace("0", id), // ✅ CORRECTION
-        getCameras: "{% url 'get_cameras' %}",  // add this line
+        getCameras: "{% url 'get_cameras' %}", // add this line
+        saveCamera: "{% url 'save_camera' %}",
       };
 
       // Initialiser la carte après le chargement

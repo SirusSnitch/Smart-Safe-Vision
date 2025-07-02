@@ -619,6 +619,20 @@ function initMap(urlConfig) {
       });
   }
 
+  function deleteCamera(id) {
+    return fetch(`/delete_camera/${id}/`, {
+      method: "DELETE",
+      headers: {
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+    })
+      .then((res) => res.ok)
+      .catch((err) => {
+        console.error("Erreur suppression caméra :", err);
+        return false;
+      });
+  }
+
   function addCameraToSidebar(camera) {
     const cameraList = document.getElementById("camera-list");
 
@@ -634,17 +648,134 @@ function initMap(urlConfig) {
       <a href="${
         camera.url
       }" target="_blank" class="camera-link">Voir la caméra</a>
+      <button class="btn btn-delete-camera" title="Supprimer la caméra" style="margin-left: 10px; color: red; border: none; background: transparent; cursor: pointer;">
+        <i class="fas fa-trash"></i>
+      </button>
     `;
 
-    cameraItem.addEventListener("click", () => {
+    // Click on item centers map on marker and opens popup
+    cameraItem.addEventListener("click", (e) => {
+      // Prevent delete button click from triggering this event
+      if (e.target.closest(".btn-delete-camera")) return;
+
       if (camera.marker) {
         map.setView(camera.marker.getLatLng(), 20);
         camera.marker.openPopup();
       }
     });
 
+    // Delete button handler
+    const deleteBtn = cameraItem.querySelector(".btn-delete-camera");
+    deleteBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevent triggering parent click event
+
+      Swal.fire({
+        title: "Confirmer la suppression",
+        text: `Voulez-vous supprimer la caméra "${camera.name}" ?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#e74c3c",
+        confirmButtonText: "Oui, supprimer",
+        cancelButtonText: "Annuler",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          deleteCamera(camera.id).then((success) => {
+            if (success) {
+              // Remove marker from map
+              if (camera.marker) {
+                cameraLayer.removeLayer(camera.marker);
+              }
+              // Remove camera from sidebar list
+              cameraItem.remove();
+
+              showToast("Caméra supprimée avec succès", "success");
+            } else {
+              showToast("Erreur lors de la suppression", "error");
+            }
+          });
+        }
+      });
+    });
+
     cameraList.appendChild(cameraItem);
   }
 
   loadCameras();
+
+  const newCameraBtn = document.getElementById("new-camera-btn");
+  const saveCameraBtn = document.getElementById("save-camera-btn");
+  let pendingCameraLatLng = null;
+
+  // Quand on clique sur "Nouvelle caméra"
+  newCameraBtn.addEventListener("click", () => {
+    showToast("Cliquez sur la carte pour placer la caméra", "info");
+    saveCameraBtn.style.display = "inline-flex";
+    // Désactiver l'ouverture popup des départements pendant ajout caméra
+    drawnItems.eachLayer((layer) => {
+      layer.off("click"); // désactive le clic qui ouvre popup
+    });
+
+    map.once("click", (e) => {
+      pendingCameraLatLng = e.latlng;
+
+      Swal.fire({
+        title: "Nouvelle caméra",
+        html: `
+        <input id="cam-name" class="swal2-input" placeholder="Nom de la caméra">
+        <input id="cam-url" class="swal2-input" placeholder="URL de la caméra">
+      `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: "Valider",
+        preConfirm: () => {
+          const name = document.getElementById("cam-name").value.trim();
+          const url = document.getElementById("cam-url").value.trim();
+          if (!name || !url) {
+            Swal.showValidationMessage("Tous les champs sont requis");
+          }
+          return { name, url };
+        },
+      }).then((result) => {
+        if (result.isConfirmed) {
+          const { name, url } = result.value;
+
+          const coordinates = [
+            pendingCameraLatLng.lng,
+            pendingCameraLatLng.lat,
+          ];
+
+          fetch("/save_camera/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: JSON.stringify({
+              name,
+              url,
+              coordinates,
+            }),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.status === "success") {
+                showToast("Caméra ajoutée avec succès", "success");
+                loadCameras(); // recharger les caméras
+              } else if (data.status === "error") {
+                // Ici on affiche le message personnalisé envoyé par le serveur
+                showToast(
+                  "Erreur : " + (data.message || "Erreur inconnue"),
+                  "error"
+                );
+              } else {
+                showToast("Erreur inattendue lors de l'ajout", "error");
+              }
+            });
+
+          saveCameraBtn.style.display = "none";
+          pendingCameraLatLng = null;
+        }
+      });
+    });
+  });
 }
