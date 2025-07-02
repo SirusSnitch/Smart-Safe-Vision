@@ -648,6 +648,9 @@ function initMap(urlConfig) {
       <a href="${
         camera.url
       }" target="_blank" class="camera-link">Voir la caméra</a>
+      <button class="btn btn-edit-camera" title="Modifier la caméra" style="margin-left: 10px; color: #3498db; border: none; background: transparent; cursor: pointer;">
+        <i class="fas fa-edit"></i>
+      </button>
       <button class="btn btn-delete-camera" title="Supprimer la caméra" style="margin-left: 10px; color: red; border: none; background: transparent; cursor: pointer;">
         <i class="fas fa-trash"></i>
       </button>
@@ -696,6 +699,65 @@ function initMap(urlConfig) {
         }
       });
     });
+
+        // Edit button handler
+    const editBtn = cameraItem.querySelector(".btn-edit-camera");
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+
+      Swal.fire({
+        title: "Modifier la caméra",
+        html: `
+          <input id="cam-edit-name" class="swal2-input" placeholder="Nom de la caméra" value="${camera.name}">
+          <input id="cam-edit-url" class="swal2-input" placeholder="URL de la caméra" value="${camera.url}">
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: "Enregistrer",
+        preConfirm: () => {
+          const name = document.getElementById("cam-edit-name").value.trim();
+          const url = document.getElementById("cam-edit-url").value.trim();
+          if (!name || !url) {
+            Swal.showValidationMessage("Tous les champs sont requis");
+          }
+          return { name, url };
+        },
+      }).then((result) => {
+        if (result.isConfirmed) {
+          const { name, url } = result.value;
+
+          fetch("/save_camera/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: JSON.stringify({
+              id: camera.id, // Utilisation de l'id pour l'update
+              name,
+              url,
+              coordinates: [camera.marker.getLatLng().lng, camera.marker.getLatLng().lat],
+            }),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.status === "success") {
+                showToast("Caméra modifiée avec succès", "success");
+                loadCameras(); // refresh
+              } else if (data.status === "error") {
+                showToast("Erreur : " + (data.message || "Erreur inconnue"), "error");
+              } else {
+                showToast("Erreur inattendue lors de la modification", "error");
+              }
+            })
+            .catch((err) => {
+              console.error("Erreur modification caméra :", err);
+              showToast("Erreur réseau lors de la modification", "error");
+            });
+        }
+      });
+    });
+
 
     cameraList.appendChild(cameraItem);
   }
