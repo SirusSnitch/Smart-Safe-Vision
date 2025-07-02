@@ -73,9 +73,24 @@
           </button>
         </div>
 
+        <div class="sidebar-header">
+          <h2>Caméras</h2>
+          <button class="tool-btn" id="new-camera-btn">
+            <i class="fas fa-plus"></i> Nouvelle
+          </button>
+          <button id="save-camera-btn" class="tool-btn" style="display: none">
+            <i class="fas fa-save"></i> Enregistrer
+          </button>
+        </div>
+
         <div class="dept-list" id="dept-list">
           <!-- Les départements seront chargés dynamiquement ici -->
         </div>
+
+        <div class="camera-list" id="camera-list">
+          <!-- Cameras will be dynamically loaded here -->
+        </div>
+
       </div>
 
       <!-- Map Container -->
@@ -136,6 +151,7 @@
         getPolygons: "{% url 'get_polygons' %}",
         savePolygon: "{% url 'save_polygon' %}",
         deletePolygon: (id) => `{% url 'delete_polygon' 0 %}`.replace("0", id), // ✅ CORRECTION
+        getCameras: "{% url 'get_cameras' %}",  // add this line
       };
 
       // Initialiser la carte après le chargement

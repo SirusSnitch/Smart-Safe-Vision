@@ -9,3 +9,13 @@ class Lieu(models.Model):
     
     def __str__(self):
         return self.name
+    
+
+class Camera(models.Model):
+    name = models.CharField(max_length=100)
+    url = models.URLField()
+    location = models.PointField()
+    department = models.ForeignKey(Lieu, on_delete=models.SET_NULL, null=True, blank=True, related_name='cameras')
+
+    def __str__(self):
+        return self.name

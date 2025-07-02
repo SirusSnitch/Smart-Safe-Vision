@@ -2,14 +2,15 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
-from django.contrib.gis.geos import GEOSGeometry
-from .models import Lieu
+from django.contrib.gis.geos import GEOSGeometry, Point
+from .models import Lieu, Camera
 import os
 from django.conf import settings
 import traceback
 from django.views.decorators.http import require_http_methods
 from django.core.serializers import serialize
 from django.contrib.gis.serializers import geojson  # ajoute ceci
+
 
 
 
@@ -119,3 +120,87 @@ def delete_polygon(request, polygon_id):
         return JsonResponse({'error': 'Polygon not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e), 'traceback': traceback.format_exc()}, status=500)
+    
+
+
+
+@csrf_exempt
+def save_camera(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            name = data.get('name')
+            url = data.get('url')
+            coordinates = data.get('coordinates')  # Expected [lng, lat]
+
+            if not name or not url or not coordinates:
+                return JsonResponse({'error': 'Name, URL, and coordinates are required'}, status=400)
+
+            point = Point(coordinates[0], coordinates[1])
+
+            # Associate with department (Lieu) if contained
+            department = None
+            for lieu in Lieu.objects.all():
+                if lieu.polygon.contains(point):
+                    department = lieu
+                    break
+
+            camera = Camera.objects.create(
+                name=name,
+                url=url,
+                location=point,
+                department=department
+            )
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Camera saved successfully',
+                'id': camera.id,
+                'department_id': department.id if department else None
+            })
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+def get_cameras(request):
+    if request.method == 'GET':
+        try:
+            cameras = Camera.objects.all()
+            features = []
+            for cam in cameras:
+                features.append({
+                    "type": "Feature",
+                    "geometry": json.loads(cam.location.geojson),
+                    "properties": {
+                        "id": cam.id,
+                        "name": cam.name,
+                        "url": cam.url,
+                        "department_id": cam.department.id if cam.department else None,
+                        "department_name": cam.department.name if cam.department else None,
+                    },
+                    "id": cam.id  # For frontend deletion
+                })
+            return JsonResponse({
+                "type": "FeatureCollection",
+                "features": features
+            })
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def delete_camera(request, camera_id):
+    try:
+        camera = Camera.objects.get(pk=camera_id)
+        camera.delete()
+        return JsonResponse({'status': 'success', 'message': 'Camera deleted successfully'})
+    except Camera.DoesNotExist:
+        return JsonResponse({'error': 'Camera not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
