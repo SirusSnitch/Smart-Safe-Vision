@@ -570,6 +570,11 @@ function initMap(urlConfig) {
 
   // Layer group to hold camera markers
 const cameraLayer = L.layerGroup().addTo(map);
+let cameraMarkers = new L.FeatureGroup();
+map.addLayer(cameraMarkers);
+let pendingCameraMarker = null; // For new or editing camera
+let editingCameraId = null;     // null if adding new camera, else the camera id being edited
+
 
 // Function to load and display cameras as markers
 function loadCameras() {
