@@ -11,6 +11,10 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from urllib.parse import urlparse, parse_qsl, unquote
+from dotenv import load_dotenv
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,7 +41,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'app'
+    'authentification',
+        'gismap',  # 
+       
+    'rest_framework',
+    'rest_framework_gis',
+
+
 ]
 
 MIDDLEWARE = [
@@ -55,7 +65,8 @@ ROOT_URLCONF = 'smartVision.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [  os.path.join(BASE_DIR, 'templates'),  # Dossier global
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -70,16 +81,24 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'smartVision.wsgi.application'
 
+AUTH_USER_MODEL = 'authentification.User'
+
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
+tmpPostgres = urlparse(os.getenv("DATABASE_URL"))
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',
+        'NAME': unquote(tmpPostgres.path[1:]),
+        'USER': unquote(tmpPostgres.username),
+        'PASSWORD': tmpPostgres.password,
+        'HOST': tmpPostgres.hostname,
+        'PORT': tmpPostgres.port or 5432,
+        'OPTIONS': dict(parse_qsl(tmpPostgres.query)),
     }
 }
+
 
 
 # Password validation
@@ -117,8 +136,31 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),  # Où sont tes fichiers statiques sources (dev)
+]
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Où collecter les fichiers statiques (prod)
+
+#Media
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = '/media/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+#email
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'  # Pour Outlook/Office 365
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'dridi.nourchenee@gmail.com'  # Votre adresse Hotmail
+EMAIL_SENDER = "dridi.nourchenee@gmail.com"
+EMAIL_HOST_PASSWORD = 'cgev gbwc hugo bxtz'
+
+
+GDAL_LIBRARY_PATH = r"C:\OSGeo4W\bin\gdal311.dll"
+GEOS_LIBRARY_PATH = r"C:\OSGeo4W\bin\geos_c.dll"

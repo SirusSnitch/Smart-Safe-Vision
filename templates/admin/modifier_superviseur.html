@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+    <!-- Header with back button -->
+    <div class="flex items-center mb-8">
+        <a href="{% url 'liste_superviseurs' %}" class="mr-3 p-1 rounded-full hover:bg-gray-100 transition-colors duration-200">
+            <span class="material-symbols-outlined text-gray-600 hover:text-gray-900">arrow_back</span>
+        </a>
+        <h1 class="text-2xl font-bold text-gray-800">Modifier {{ superviseur.get_full_name }}</h1>
+    </div>
+
+    <!-- Affichage des messages -->
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 p-4 text-sm rounded-lg {% if message.tags == 'success' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Form container -->
+    <div class="bg-white shadow-md rounded-xl overflow-hidden p-6 border border-gray-200">
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+
+            <!-- CIN Field -->
+            <div class="space-y-2">
+                <label for="{{ form.cin.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.cin.label }} <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span class="material-symbols-outlined text-gray-400 text-lg">badge</span>
+                    </div>
+                    <input type="text" id="{{ form.cin.id_for_label }}" name="{{ form.cin.name }}"
+                           value="{{ form.cin.value|default:'' }}"
+                           class="block w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                           placeholder="Numéro CIN">
+                </div>
+                {% if form.cin.errors %}
+                    <div class="text-red-500 text-sm mt-1">{{ form.cin.errors }}</div>
+                {% endif %}
+            </div>
+
+            <!-- Email Field -->
+            <div class="space-y-2">
+                <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.email.label }} <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span class="material-symbols-outlined text-gray-400 text-lg">mail</span>
+                    </div>
+                    <input type="email" id="{{ form.email.id_for_label }}" name="{{ form.email.name }}"
+                           value="{{ form.email.value|default:'' }}"
+                           class="block w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                           placeholder="votre@email.com">
+                </div>
+                {% if form.email.errors %}
+                    <div class="text-red-500 text-sm mt-1">{{ form.email.errors }}</div>
+                {% endif %}
+            </div>
+
+            <!-- Name Fields -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- First Name -->
+                <div class="space-y-2">
+                    <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ form.first_name.label }} <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="material-symbols-outlined text-gray-400 text-lg">person</span>
+                        </div>
+                        <input type="text" id="{{ form.first_name.id_for_label }}" name="{{ form.first_name.name }}"
+                               value="{{ form.first_name.value|default:'' }}"
+                               class="block w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                               placeholder="Prénom">
+                    </div>
+                    {% if form.first_name.errors %}
+                        <div class="text-red-500 text-sm mt-1">{{ form.first_name.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Last Name -->
+                <div class="space-y-2">
+                    <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ form.last_name.label }} <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="material-symbols-outlined text-gray-400 text-lg">person</span>
+                        </div>
+                        <input type="text" id="{{ form.last_name.id_for_label }}" name="{{ form.last_name.name }}"
+                               value="{{ form.last_name.value|default:'' }}"
+                               class="block w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                               placeholder="Nom">
+                    </div>
+                    {% if form.last_name.errors %}
+                        <div class="text-red-500 text-sm mt-1">{{ form.last_name.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Phone Field -->
+            <div class="space-y-2">
+                <label for="{{ form.phone.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.phone.label }}
+                </label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span class="material-symbols-outlined text-gray-400 text-lg">call</span>
+                    </div>
+                    <input type="tel" id="{{ form.phone.id_for_label }}" name="{{ form.phone.name }}"
+                           value="{{ form.phone.value|default:'' }}"
+                           class="block w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                           placeholder="Numéro de téléphone">
+                </div>
+                {% if form.phone.errors %}
+                    <div class="text-red-500 text-sm mt-1">{{ form.phone.errors }}</div>
+                {% endif %}
+            </div>
+
+            <!-- Form Actions -->
+            <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200 mt-8">
+                <a href="{% url 'liste_superviseurs' %}" class="inline-flex items-center px-5 py-2.5 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+                    Annuler
+                </a>
+                <button type="submit" class="inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+                    Enregistrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
