@@ -619,8 +619,23 @@ function loadCameras() {
     });
   }
 
+function deleteCamera(id) {
+  return fetch(`/delete_camera/${id}/`, {
+    method: "DELETE",
+    headers: {
+      "X-CSRFToken": getCookie("csrftoken"),
+    },
+  })
+    .then((res) => res.ok)
+    .catch((err) => {
+      console.error("Erreur suppression caméra :", err);
+      return false;
+    });
+}
 
-  function addCameraToSidebar(camera) {
+
+
+function addCameraToSidebar(camera) {
     const cameraList = document.getElementById("camera-list");
 
     const cameraItem = document.createElement("div");
@@ -631,17 +646,58 @@ function loadCameras() {
       <div class="camera-name">${camera.name}</div>
       <div class="camera-department">${camera.department_name || 'Aucun département'}</div>
       <a href="${camera.url}" target="_blank" class="camera-link">Voir la caméra</a>
+      <button class="btn btn-delete-camera" title="Supprimer la caméra" style="margin-left: 10px; color: red; border: none; background: transparent; cursor: pointer;">
+        <i class="fas fa-trash"></i>
+      </button>
     `;
 
-    cameraItem.addEventListener("click", () => {
+    // Click on item centers map on marker and opens popup
+    cameraItem.addEventListener("click", (e) => {
+      // Prevent delete button click from triggering this event
+      if (e.target.closest(".btn-delete-camera")) return;
+
       if (camera.marker) {
         map.setView(camera.marker.getLatLng(), 20);
         camera.marker.openPopup();
       }
     });
 
+    // Delete button handler
+    const deleteBtn = cameraItem.querySelector(".btn-delete-camera");
+    deleteBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevent triggering parent click event
+
+      Swal.fire({
+        title: "Confirmer la suppression",
+        text: `Voulez-vous supprimer la caméra "${camera.name}" ?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#e74c3c",
+        confirmButtonText: "Oui, supprimer",
+        cancelButtonText: "Annuler",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          deleteCamera(camera.id).then((success) => {
+            if (success) {
+              // Remove marker from map
+              if (camera.marker) {
+                cameraLayer.removeLayer(camera.marker);
+              }
+              // Remove camera from sidebar list
+              cameraItem.remove();
+
+              showToast("Caméra supprimée avec succès", "success");
+            } else {
+              showToast("Erreur lors de la suppression", "error");
+            }
+          });
+        }
+      });
+    });
+
     cameraList.appendChild(cameraItem);
   }
+
 
 
   loadCameras();
