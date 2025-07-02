@@ -567,58 +567,57 @@ function initMap(urlConfig) {
     });
   });
 
-
   // Layer group to hold camera markers
-const cameraLayer = L.layerGroup().addTo(map);
+  const cameraLayer = L.layerGroup().addTo(map);
 
-// Function to load and display cameras as markers
-function loadCameras() {
-  fetch(urlConfig.getCameras)
-    .then(res => res.json())
-    .then(data => {
-      cameraLayer.clearLayers();  // clear old markers
+  // Function to load and display cameras as markers
+  function loadCameras() {
+    fetch(urlConfig.getCameras)
+      .then((res) => res.json())
+      .then((data) => {
+        cameraLayer.clearLayers(); // clear old markers
 
-      const cameraList = document.getElementById("camera-list");
-      cameraList.innerHTML = "";  // clear old camera list
+        const cameraList = document.getElementById("camera-list");
+        cameraList.innerHTML = ""; // clear old camera list
 
-      if (data.features && data.features.length) {
-        data.features.forEach(feature => {
-          const coords = feature.geometry.coordinates;
-          const props = feature.properties;
+        if (data.features && data.features.length) {
+          data.features.forEach((feature) => {
+            const coords = feature.geometry.coordinates;
+            const props = feature.properties;
 
-          // Create marker
-          const marker = L.marker([coords[1], coords[0]], {
-            title: props.name,
-            icon: L.icon({
-              iconUrl: 'https://cdn-icons-png.flaticon.com/512/854/854878.png',
-              iconSize: [30, 30],
-              iconAnchor: [15, 30],
-              popupAnchor: [0, -30],
-            }),
-          });
+            // Create marker
+            const marker = L.marker([coords[1], coords[0]], {
+              title: props.name,
+              icon: L.icon({
+                iconUrl:
+                  "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+                iconSize: [30, 30],
+                iconAnchor: [15, 30],
+                popupAnchor: [0, -30],
+              }),
+            });
 
-          marker.bindPopup(`
+            marker.bindPopup(`
             <strong>${props.name}</strong><br>
             <a href="${props.url}" target="_blank">Voir la caméra</a><br>
-            Département: ${props.department_name || 'Aucun'}
+            Département: ${props.department_name || "Aucun"}
           `);
 
-          cameraLayer.addLayer(marker);
+            cameraLayer.addLayer(marker);
 
-          // Add marker reference to props for sidebar interaction
-          props.marker = marker;
+            // Add marker reference to props for sidebar interaction
+            props.marker = marker;
 
-          // Add to sidebar list
-          addCameraToSidebar(props);
-        });
-      }
-    })
-    .catch(err => {
-      console.error('Erreur chargement caméras:', err);
-      showToast('Erreur lors du chargement des caméras', 'error');
-    });
+            // Add to sidebar list
+            addCameraToSidebar(props);
+          });
+        }
+      })
+      .catch((err) => {
+        console.error("Erreur chargement caméras:", err);
+        showToast("Erreur lors du chargement des caméras", "error");
+      });
   }
-
 
   function addCameraToSidebar(camera) {
     const cameraList = document.getElementById("camera-list");
@@ -629,8 +628,12 @@ function loadCameras() {
 
     cameraItem.innerHTML = `
       <div class="camera-name">${camera.name}</div>
-      <div class="camera-department">${camera.department_name || 'Aucun département'}</div>
-      <a href="${camera.url}" target="_blank" class="camera-link">Voir la caméra</a>
+      <div class="camera-department">${
+        camera.department_name || "Aucun département"
+      }</div>
+      <a href="${
+        camera.url
+      }" target="_blank" class="camera-link">Voir la caméra</a>
     `;
 
     cameraItem.addEventListener("click", () => {
@@ -643,9 +646,5 @@ function loadCameras() {
     cameraList.appendChild(cameraItem);
   }
 
-
   loadCameras();
-
-
-
 }
