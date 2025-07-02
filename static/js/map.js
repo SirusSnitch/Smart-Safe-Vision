@@ -567,80 +567,73 @@ function initMap(urlConfig) {
     });
   });
 
-
   // Layer group to hold camera markers
-const cameraLayer = L.layerGroup().addTo(map);
-let cameraMarkers = new L.FeatureGroup();
-map.addLayer(cameraMarkers);
-let pendingCameraMarker = null; // For new or editing camera
-let editingCameraId = null;     // null if adding new camera, else the camera id being edited
+  const cameraLayer = L.layerGroup().addTo(map);
 
+  // Function to load and display cameras as markers
+  function loadCameras() {
+    fetch(urlConfig.getCameras)
+      .then((res) => res.json())
+      .then((data) => {
+        cameraLayer.clearLayers(); // clear old markers
 
-// Function to load and display cameras as markers
-function loadCameras() {
-  fetch(urlConfig.getCameras)
-    .then(res => res.json())
-    .then(data => {
-      cameraLayer.clearLayers();  // clear old markers
+        const cameraList = document.getElementById("camera-list");
+        cameraList.innerHTML = ""; // clear old camera list
 
-      const cameraList = document.getElementById("camera-list");
-      cameraList.innerHTML = "";  // clear old camera list
+        if (data.features && data.features.length) {
+          data.features.forEach((feature) => {
+            const coords = feature.geometry.coordinates;
+            const props = feature.properties;
 
-      if (data.features && data.features.length) {
-        data.features.forEach(feature => {
-          const coords = feature.geometry.coordinates;
-          const props = feature.properties;
+            // Create marker
+            const marker = L.marker([coords[1], coords[0]], {
+              title: props.name,
+              icon: L.icon({
+                iconUrl:
+                  "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+                iconSize: [30, 30],
+                iconAnchor: [15, 30],
+                popupAnchor: [0, -30],
+              }),
+            });
 
-          // Create marker
-          const marker = L.marker([coords[1], coords[0]], {
-            title: props.name,
-            icon: L.icon({
-              iconUrl: 'https://cdn-icons-png.flaticon.com/512/854/854878.png',
-              iconSize: [30, 30],
-              iconAnchor: [15, 30],
-              popupAnchor: [0, -30],
-            }),
-          });
-
-          marker.bindPopup(`
+            marker.bindPopup(`
             <strong>${props.name}</strong><br>
             <a href="${props.url}" target="_blank">Voir la caméra</a><br>
-            Département: ${props.department_name || 'Aucun'}
+            Département: ${props.department_name || "Aucun"}
           `);
 
-          cameraLayer.addLayer(marker);
+            cameraLayer.addLayer(marker);
 
-          // Add marker reference to props for sidebar interaction
-          props.marker = marker;
+            // Add marker reference to props for sidebar interaction
+            props.marker = marker;
 
-          // Add to sidebar list
-          addCameraToSidebar(props);
-        });
-      }
-    })
-    .catch(err => {
-      console.error('Erreur chargement caméras:', err);
-      showToast('Erreur lors du chargement des caméras', 'error');
-    });
+            // Add to sidebar list
+            addCameraToSidebar(props);
+          });
+        }
+      })
+      .catch((err) => {
+        console.error("Erreur chargement caméras:", err);
+        showToast("Erreur lors du chargement des caméras", "error");
+      });
   }
 
-function deleteCamera(id) {
-  return fetch(`/delete_camera/${id}/`, {
-    method: "DELETE",
-    headers: {
-      "X-CSRFToken": getCookie("csrftoken"),
-    },
-  })
-    .then((res) => res.ok)
-    .catch((err) => {
-      console.error("Erreur suppression caméra :", err);
-      return false;
-    });
-}
+  function deleteCamera(id) {
+    return fetch(`/delete_camera/${id}/`, {
+      method: "DELETE",
+      headers: {
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+    })
+      .then((res) => res.ok)
+      .catch((err) => {
+        console.error("Erreur suppression caméra :", err);
+        return false;
+      });
+  }
 
-
-
-function addCameraToSidebar(camera) {
+  function addCameraToSidebar(camera) {
     const cameraList = document.getElementById("camera-list");
 
     const cameraItem = document.createElement("div");
@@ -649,8 +642,12 @@ function addCameraToSidebar(camera) {
 
     cameraItem.innerHTML = `
       <div class="camera-name">${camera.name}</div>
-      <div class="camera-department">${camera.department_name || 'Aucun département'}</div>
-      <a href="${camera.url}" target="_blank" class="camera-link">Voir la caméra</a>
+      <div class="camera-department">${
+        camera.department_name || "Aucun département"
+      }</div>
+      <a href="${
+        camera.url
+      }" target="_blank" class="camera-link">Voir la caméra</a>
       <button class="btn btn-delete-camera" title="Supprimer la caméra" style="margin-left: 10px; color: red; border: none; background: transparent; cursor: pointer;">
         <i class="fas fa-trash"></i>
       </button>
@@ -703,10 +700,82 @@ function addCameraToSidebar(camera) {
     cameraList.appendChild(cameraItem);
   }
 
-
-
   loadCameras();
 
+  const newCameraBtn = document.getElementById("new-camera-btn");
+  const saveCameraBtn = document.getElementById("save-camera-btn");
+  let pendingCameraLatLng = null;
 
+  // Quand on clique sur "Nouvelle caméra"
+  newCameraBtn.addEventListener("click", () => {
+    showToast("Cliquez sur la carte pour placer la caméra", "info");
+    saveCameraBtn.style.display = "inline-flex";
+    // Désactiver l'ouverture popup des départements pendant ajout caméra
+    drawnItems.eachLayer((layer) => {
+      layer.off("click"); // désactive le clic qui ouvre popup
+    });
 
+    map.once("click", (e) => {
+      pendingCameraLatLng = e.latlng;
+
+      Swal.fire({
+        title: "Nouvelle caméra",
+        html: `
+        <input id="cam-name" class="swal2-input" placeholder="Nom de la caméra">
+        <input id="cam-url" class="swal2-input" placeholder="URL de la caméra">
+      `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: "Valider",
+        preConfirm: () => {
+          const name = document.getElementById("cam-name").value.trim();
+          const url = document.getElementById("cam-url").value.trim();
+          if (!name || !url) {
+            Swal.showValidationMessage("Tous les champs sont requis");
+          }
+          return { name, url };
+        },
+      }).then((result) => {
+        if (result.isConfirmed) {
+          const { name, url } = result.value;
+
+          const coordinates = [
+            pendingCameraLatLng.lng,
+            pendingCameraLatLng.lat,
+          ];
+
+          fetch("/save_camera/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: JSON.stringify({
+              name,
+              url,
+              coordinates,
+            }),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.status === "success") {
+                showToast("Caméra ajoutée avec succès", "success");
+                loadCameras(); // recharger les caméras
+              } else if (data.status === "error") {
+                // Ici on affiche le message personnalisé envoyé par le serveur
+                showToast(
+                  "Erreur : " + (data.message || "Erreur inconnue"),
+                  "error"
+                );
+              } else {
+                showToast("Erreur inattendue lors de l'ajout", "error");
+              }
+            });
+
+          saveCameraBtn.style.display = "none";
+          pendingCameraLatLng = null;
+        }
+      });
+    });
+  });
 }

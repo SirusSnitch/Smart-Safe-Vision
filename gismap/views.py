@@ -127,39 +127,32 @@ def delete_polygon(request, polygon_id):
 @csrf_exempt
 @require_http_methods(["POST"])
 def save_camera(request):
-    try:
-        data = json.loads(request.body)
-        camera_id = data.get('id')  # Optional, for update
-        name = data.get('name')
-        url = data.get('url')
-        coordinates = data.get('coordinates')  # Expected [lng, lat]
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            name = data.get('name')
+            url = data.get('url')
+            coordinates = data.get('coordinates')  # [lng, lat]
 
         if not name or not url or not coordinates:
             return JsonResponse({'error': 'Name, URL, and coordinates are required'}, status=400)
 
         point = Point(coordinates[0], coordinates[1])
 
-        # Associate with department (Lieu) if contained
-        department = None
-        for lieu in Lieu.objects.all():
-            if lieu.polygon.contains(point):
-                department = lieu
-                break
+            # Vérifier que la caméra est dans un lieu (polygone)
+            department = None
+            for lieu in Lieu.objects.all():
+                if lieu.polygon.contains(point):
+                    department = lieu
+                    break
 
-        if camera_id:
-            # Update existing camera
-            try:
-                camera = Camera.objects.get(pk=camera_id)
-                camera.name = name
-                camera.url = url
-                camera.location = point
-                camera.department = department
-                camera.save()
-                message = "Camera updated successfully"
-            except Camera.DoesNotExist:
-                return JsonResponse({'error': 'Camera not found'}, status=404)
-        else:
-            # Create new camera
+            if department is None:
+                # Pas dans un lieu -> Refus
+                return JsonResponse({
+                    'status': 'error',
+                    'message': "La caméra doit être placée à l'intérieur d'un département existant."
+                }, status=400)
+
             camera = Camera.objects.create(
                 name=name,
                 url=url,
@@ -168,17 +161,17 @@ def save_camera(request):
             )
             message = "Camera saved successfully"
 
-        return JsonResponse({
-            'status': 'success',
-            'message': message,
-            'id': camera.id,
-            'department_id': department.id if department else None
-        })
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Camera saved successfully',
+                'id': camera.id,
+                'department_id': department.id
+            })
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
 def get_cameras(request):
