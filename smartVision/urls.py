@@ -20,4 +20,6 @@ from django.urls import path , include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('authentification.urls')),
+        path('', include('gismap.urls')),  # <-- inclut les urls de l'app gismap à la racine
+
 ]

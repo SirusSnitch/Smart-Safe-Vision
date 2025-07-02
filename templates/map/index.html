@@ -1,0 +1,147 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ISGB - Gestion des Départements</title>
+
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <!-- Toastify CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+    />
+
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <link rel="stylesheet" href="{% static 'css/map.css' %}" />
+  </head>
+  <body>
+    <!-- Header -->
+    <header>
+      <div class="logo-container">
+        <div class="logo">
+          <i class="fas fa-map-marked-alt"></i>
+        </div>
+        <div class="header-text">
+          <h1>Gestion des Départements ISGB</h1>
+          <p>Délimitation et gestion des zones départementales</p>
+        </div>
+      </div>
+
+      <div class="stats-container">
+        <div class="stat-item">
+          <div class="stat-value" id="dept-count">0</div>
+          <div class="stat-label">Départements</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="total-area">0 ha</div>
+          <div class="stat-label">Surface totale</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="coverage">0%</div>
+          <div class="stat-label">Couverture</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="main-container">
+      <!-- Sidebar -->
+      <div class="sidebar" id="sidebar">
+        <div class="sidebar-toggle" id="sidebarToggle">
+          <i class="fas fa-times"></i>
+        </div>
+
+        <div class="sidebar-header">
+          <h2>Départements</h2>
+          <button class="tool-btn" id="new-dept-btn">
+            <i class="fas fa-plus"></i> Nouveau
+          </button>
+          <button id="save-dept-btn" class="tool-btn" style="display: none">
+            <i class="fas fa-save"></i> Enregistrer
+          </button>
+        </div>
+
+        <div class="dept-list" id="dept-list">
+          <!-- Les départements seront chargés dynamiquement ici -->
+        </div>
+      </div>
+
+      <!-- Map Container -->
+      <div class="map-container">
+        <div class="sidebar-toggle-mobile" id="sidebarToggleMobile">
+          <i class="fas fa-layer-group"></i>
+        </div>
+        <div id="map"></div>
+
+        <!-- Legend -->
+        <div id="legend">
+          <div class="legend-header">
+            <h3><i class="fas fa-map-legend"></i> Légende</h3>
+            <button class="legend-toggle">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+          <div class="legend-content">
+            <div class="legend-item">
+              <div
+                class="legend-color"
+                style="
+                  background-color: rgba(0, 0, 255, 0.3);
+                  border: 2px solid blue;
+                "
+              ></div>
+              <span class="legend-label">Périmètre ISGB</span>
+            </div>
+            <div class="legend-item">
+              <div
+                class="legend-color"
+                style="
+                  background-color: rgba(255, 120, 0, 0.4);
+                  border: 2px solid #ff7800;
+                "
+              ></div>
+              <span class="legend-label">Départements</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JS Libraries -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- JS local -->
+    <script src="{% static 'js/map.js' %}"></script>
+
+    <!-- Initialisation avec les données Django -->
+    <script>
+      // Passer les URLs Django au JavaScript
+      const urlConfig = {
+        getPolygons: "{% url 'get_polygons' %}",
+        savePolygon: "{% url 'save_polygon' %}",
+        deletePolygon: (id) => `{% url 'delete_polygon' 0 %}`.replace("0", id), // ✅ CORRECTION
+      };
+
+      // Initialiser la carte après le chargement
+      document.addEventListener("DOMContentLoaded", () => {
+        initMap(urlConfig);
+      });
+    </script>
+  </body>
+</html>
