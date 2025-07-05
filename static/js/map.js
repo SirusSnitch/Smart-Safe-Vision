@@ -468,45 +468,52 @@ function initMap(urlConfig) {
   loadPolygons();
 
   // Gestion des clics sur les boutons dans les popups - CORRIGÉ
+  // À mettre dans ta fonction initMap, remplace la partie map.on("popupopen", ...) par ceci :
+
   map.on("popupopen", (e) => {
     const popup = e.popup;
     const content = popup.getElement();
     const layer = e.popup._source;
 
-    content.addEventListener("click", function (e) {
-      // Gérer le bouton Modifier
-      if (e.target.closest(".edit-btn")) {
-        e.stopPropagation();
-        popup.remove(); // ❌ ferme le popup
+    // Nettoyer tout ancien gestionnaire sur ce popup pour éviter doublons
+    content.onclick = null;
 
-        layer.editing?.enable?.(); // ✅ active mode édition
+    content.addEventListener("click", function (evt) {
+      // Bouton Modifier
+      if (evt.target.closest(".edit-btn")) {
+        evt.stopPropagation();
+        popup.remove();
 
-        showToast("Modifiez la forme, puis cliquez sur 'Enregistrer'", "info");
+        if (layer.editing) {
+          layer.editing.enable();
+        }
 
-        // Créer bouton enregistrer
+        // Création du bouton "Enregistrer"
         const saveBtn = L.DomUtil.create("button", "leaflet-bar save-edit-btn");
         saveBtn.innerHTML = '<i class="fas fa-save"></i> Enregistrer';
-        saveBtn.style.position = "absolute";
-        saveBtn.style.top = "100px";
-        saveBtn.style.left = "10px";
-        saveBtn.style.zIndex = "1001";
-        saveBtn.style.background = "#27ae60";
-        saveBtn.style.color = "white";
-        saveBtn.style.padding = "8px 12px";
-        saveBtn.style.border = "none";
-        saveBtn.style.borderRadius = "6px";
-        saveBtn.style.cursor = "pointer";
-        saveBtn.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)";
-        saveBtn.style.fontWeight = "600";
-
+        Object.assign(saveBtn.style, {
+          position: "absolute",
+          top: "100px",
+          left: "10px",
+          zIndex: "1001",
+          background: "#27ae60",
+          color: "white",
+          padding: "8px 12px",
+          border: "none",
+          borderRadius: "6px",
+          cursor: "pointer",
+          boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+          fontWeight: "600",
+        });
         document.body.appendChild(saveBtn);
 
-        // Au clic sur Enregistrer
         saveBtn.addEventListener("click", () => {
-          layer.editing?.disable?.(); // désactive le mode édition
+          if (layer.editing) {
+            layer.editing.disable();
+          }
 
           const geojson = layer.toGeoJSON();
-          const area = (turf.area(geojson) / 10000).toFixed(2); // ha
+          const area = (turf.area(geojson) / 10000).toFixed(2);
           const feature = layer.feature;
 
           feature.geometry = geojson.geometry;
@@ -524,7 +531,7 @@ function initMap(urlConfig) {
               feature.properties.name = result.value;
 
               updatePolygon(feature).then(() => {
-                layer.bindPopup(createPopupContent(feature)); // remettre popup
+                layer.bindPopup(createPopupContent(feature));
                 updateDeptInSidebar(feature);
                 updateStats(0, 0);
                 showToast("Modifications enregistrées", "success");
@@ -534,13 +541,13 @@ function initMap(urlConfig) {
             }
           });
 
-          saveBtn.remove(); // Supprimer le bouton
+          saveBtn.remove();
         });
       }
 
-      // Gérer le bouton Supprimer
-      if (e.target.closest(".delete-btn")) {
-        e.stopPropagation();
+      // Bouton Supprimer
+      if (evt.target.closest(".delete-btn")) {
+        evt.stopPropagation();
         const id = layer.feature.id;
 
         Swal.fire({
@@ -553,12 +560,15 @@ function initMap(urlConfig) {
           cancelButtonText: "Annuler",
         }).then((result) => {
           if (result.isConfirmed) {
-            drawnItems.removeLayer(layer);
             deletePolygon(id).then((success) => {
               if (success) {
+                // Ne supprimer le layer QUE si succès serveur
+                drawnItems.removeLayer(layer);
                 removeDeptFromSidebar(id);
                 updateStats(-parseFloat(layer.feature.properties.area), -1);
                 showToast("Département supprimé", "success");
+              } else {
+                showToast("Erreur lors de la suppression", "error");
               }
             });
           }
@@ -648,9 +658,6 @@ function initMap(urlConfig) {
       <a href="${
         camera.url
       }" target="_blank" class="camera-link">Voir la caméra</a>
-      <button class="btn btn-edit-camera" title="Modifier la caméra" style="margin-left: 10px; color: #3498db; border: none; background: transparent; cursor: pointer;">
-        <i class="fas fa-edit"></i>
-      </button>
       <button class="btn btn-delete-camera" title="Supprimer la caméra" style="margin-left: 10px; color: red; border: none; background: transparent; cursor: pointer;">
         <i class="fas fa-trash"></i>
       </button>
@@ -696,70 +703,6 @@ function initMap(urlConfig) {
               showToast("Erreur lors de la suppression", "error");
             }
           });
-        }
-      });
-    });
-
-    // Edit button handler
-    const editBtn = cameraItem.querySelector(".btn-edit-camera");
-    editBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-
-      Swal.fire({
-        title: "Modifier la caméra",
-        html: `
-          <input id="cam-edit-name" class="swal2-input" placeholder="Nom de la caméra" value="${camera.name}">
-          <input id="cam-edit-url" class="swal2-input" placeholder="URL de la caméra" value="${camera.url}">
-        `,
-        focusConfirm: false,
-        showCancelButton: true,
-        confirmButtonText: "Enregistrer",
-        preConfirm: () => {
-          const name = document.getElementById("cam-edit-name").value.trim();
-          const url = document.getElementById("cam-edit-url").value.trim();
-          if (!name || !url) {
-            Swal.showValidationMessage("Tous les champs sont requis");
-          }
-          return { name, url };
-        },
-      }).then((result) => {
-        if (result.isConfirmed) {
-          const { name, url } = result.value;
-
-          fetch("/save_camera/", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-CSRFToken": getCookie("csrftoken"),
-            },
-            body: JSON.stringify({
-              id: camera.id, // Utilisation de l'id pour l'update
-              name,
-              url,
-              coordinates: [
-                camera.marker.getLatLng().lng,
-                camera.marker.getLatLng().lat,
-              ],
-            }),
-          })
-            .then((res) => res.json())
-            .then((data) => {
-              if (data.status === "success") {
-                showToast("Caméra modifiée avec succès", "success");
-                loadCameras(); // refresh
-              } else if (data.status === "error") {
-                showToast(
-                  "Erreur : " + (data.message || "Erreur inconnue"),
-                  "error"
-                );
-              } else {
-                showToast("Erreur inattendue lors de la modification", "error");
-              }
-            })
-            .catch((err) => {
-              console.error("Erreur modification caméra :", err);
-              showToast("Erreur réseau lors de la modification", "error");
-            });
         }
       });
     });

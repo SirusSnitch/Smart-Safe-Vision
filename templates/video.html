@@ -1,0 +1,20 @@
+{% extends 'base.html' %} {% block content %}
+<h2>Flux caméra simulée</h2>
+<video id="video" controls autoplay width="640" height="360"></video>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+  const video = document.getElementById("video");
+  if (Hls.isSupported()) {
+    const hls = new Hls();
+    hls.loadSource("/static/hls/stream.m3u8"); // chemin accessible depuis Django
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+  } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = "/static/hls/stream.m3u8";
+    video.addEventListener("loadedmetadata", () => video.play());
+  } else {
+    alert("Votre navigateur ne supporte pas le streaming HLS");
+  }
+</script>
+{% endblock %}
