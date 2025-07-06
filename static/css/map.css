@@ -23,17 +23,7 @@ body {
     overflow: hidden;
 }
 
-/* Header Styles */
-header {
-    background: linear-gradient(135deg, var(--primary), #1a2530);
-    color: white;
-    padding: 1rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    z-index: 1000;
-}
+
 
 .logo-container {
     display: flex;
@@ -473,4 +463,3 @@ header {
   font-size: 14px;
   border-radius: 6px;
 }
-

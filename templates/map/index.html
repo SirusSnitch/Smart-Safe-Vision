@@ -1,4 +1,6 @@
-{% extends 'base.html' %} {% load static %} {% block content %}
+{% extends 'base.html' %} 
+{% load static %} 
+{% block content %}
 <!DOCTYPE html>
 <html lang="fr">
   <head>
@@ -7,54 +9,70 @@
     <title>ISGB - Gestion des Départements</title>
 
     <!-- Leaflet CSS -->
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <!-- Toastify CSS -->
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
-    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" />
 
     <!-- Font Awesome -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-    />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
     <link rel="stylesheet" href="{% static 'css/map.css' %}" />
+    <style>
+      /* Ajoutez ces styles pour ajuster la mise en page */
+      body, html {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      
+      .main-container {
+        display: flex;
+        height: 100vh;
+        width: 100vw;
+      }
+      
+      .map-container {
+        flex: 1;
+        position: relative;
+      }
+      
+      #map {
+        height: 100%;
+        width: 100%;
+      }
+      
+      .stats-container {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 15px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        display: flex;
+        gap: 20px;
+      }
+      
+      .stat-item {
+        text-align: center;
+        padding: 0 10px;
+      }
+      
+      .stat-value {
+        font-weight: bold;
+        font-size: 1.2em;
+      }
+      
+      .stat-label {
+        font-size: 0.8em;
+        color: #555;
+      }
+    </style>
   </head>
   <body>
-    <!-- Header -->
-    <header>
-      <div class="logo-container">
-        <div class="logo">
-          <i class="fas fa-map-marked-alt"></i>
-        </div>
-        <div class="header-text">
-          <h1>Gestion des Départements ISGB</h1>
-          <p>Délimitation et gestion des zones départementales</p>
-        </div>
-      </div>
-
-      <div class="stats-container">
-        <div class="stat-item">
-          <div class="stat-value" id="dept-count">0</div>
-          <div class="stat-label">Départements</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value" id="total-area">0 ha</div>
-          <div class="stat-label">Surface totale</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value" id="coverage">0%</div>
-          <div class="stat-label">Couverture</div>
-        </div>
-      </div>
-    </header>
-
     <!-- Main Content -->
     <div class="main-container">
       <!-- Sidebar -->
@@ -97,6 +115,23 @@
         <div class="sidebar-toggle-mobile" id="sidebarToggleMobile">
           <i class="fas fa-layer-group"></i>
         </div>
+        
+        <!-- Stats Container -->
+        <div class="stats-container">
+          <div class="stat-item">
+            <div class="stat-value" id="dept-count">0</div>
+            <div class="stat-label">Départements</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="total-area">0 ha</div>
+            <div class="stat-label">Surface totale</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="coverage">0%</div>
+            <div class="stat-label">Couverture</div>
+          </div>
+        </div>
+        
         <div id="map"></div>
 
         <!-- Legend -->
@@ -149,8 +184,8 @@
       const urlConfig = {
         getPolygons: "{% url 'get_polygons' %}",
         savePolygon: "{% url 'save_polygon' %}",
-        deletePolygon: (id) => `{% url 'delete_polygon' 0 %}`.replace("0", id), // ✅ CORRECTION
-        getCameras: "{% url 'get_cameras' %}", // add this line
+        deletePolygon: (id) => `{% url 'delete_polygon' 0 %}`.replace("0", id),
+        getCameras: "{% url 'get_cameras' %}",
         saveCamera: "{% url 'save_camera' %}",
       };
 
@@ -158,6 +193,7 @@
       document.addEventListener("DOMContentLoaded", () => {
         initMap(urlConfig);
       });
+      var currentUserRole = "{{ request.user.role|default:'guest' }}";
     </script>
   </body>
 </html>
