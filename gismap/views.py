@@ -1,3 +1,5 @@
+import threading
+
 from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
@@ -12,6 +14,33 @@ import traceback
 from django.views.decorators.http import require_http_methods
 from django.core.serializers import serialize
 from django.contrib.gis.serializers import geojson
+import cv2
+import time
+
+# global dict to track running threads
+running_threads = {}
+
+
+def process_camera_stream(camera_id, camera_url):
+    print(f"[{camera_id}] Started processing thread for {camera_url}")
+    cap = cv2.VideoCapture(camera_url)
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print(f"[{camera_id}] Failed to get frame")
+            time.sleep(1)
+            continue
+
+        # تقدر تعمل هنا معالجة ذكاء صناعي، تخزين، إرسال ...
+        print(f"[{camera_id}] Frame reçu")
+
+        time.sleep(0.03)  # simulate 30 fps
+
+def start_camera_thread(camera_id, url):
+    if camera_id not in running_threads:
+        t = threading.Thread(target=process_camera_stream, args=(camera_id, url), daemon=True)
+        t.start()
+        running_threads[camera_id] = t
 
 
 # ✅ Vue de connexion (sign in)
@@ -166,6 +195,8 @@ def save_camera(request):
             camera.department = department
             camera.save()
             message = 'Camera updated successfully'
+            start_camera_thread(camera.id, camera.url)
+
         else:
             camera = Camera.objects.create(
                 name=name,

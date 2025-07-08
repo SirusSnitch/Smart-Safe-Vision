@@ -1,458 +1,458 @@
 <!-- Desktop Sidebar -->
 <aside
-  id="sidebar"
-  class="hidden md:flex md:flex-shrink-0 transition-all duration-300"
+        id="sidebar"
+        class="hidden md:flex md:flex-shrink-0 transition-all duration-300"
 >
-  <div
-    class="flex flex-col w-64 h-full bg-white border-r border-gray-200 shadow-sm"
-  >
-    <!-- Logo -->
     <div
-      class="flex items-center justify-center h-16 px-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white"
+            class="flex flex-col w-64 h-full bg-white border-r border-gray-200 shadow-sm"
     >
-      <a href="{% url 'admin_main' %}" class="flex items-center group">
+        <!-- Logo -->
+        <div
+                class="flex items-center justify-center h-16 px-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white"
+        >
+            <a href="{% url 'admin_main' %}" class="flex items-center group">
         <span
-          class="text-2xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors"
-          >Smart</span
+                class="text-2xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors"
+        >Smart</span
         >
-        <span
-          class="text-2xl font-semibold text-blue-600 group-hover:text-blue-800 transition-colors"
-          >Vision</span
-        >
-      </a>
-    </div>
-
-    <!-- Menu -->
-    <div
-      class="flex flex-col flex-grow px-4 py-4 overflow-y-auto custom-scrollbar"
-    >
-      <nav class="flex-1 space-y-1">
-        <!-- Main Menu Section -->
-        <div class="pt-2">
-          <p
-            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
-            style="margin-top: 40px"
-          >
-            Menu Principal
-          </p>
+                <span
+                        class="text-2xl font-semibold text-blue-600 group-hover:text-blue-800 transition-colors"
+                >Vision</span
+                >
+            </a>
         </div>
-        {% if user.is_authenticated and user.role == 'ADMIN' %}
-        <a
-          href="{% url 'admin_main' %}"
-          class="flex items-center px-4 py-2.5 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors group"
+
+        <!-- Menu -->
+        <div
+                class="flex flex-col flex-grow px-4 py-4 overflow-y-auto custom-scrollbar"
         >
+            <nav class="flex-1 space-y-1">
+                <!-- Main Menu Section -->
+                <div class="pt-2">
+                    <p
+                            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
+                            style="margin-top: 40px"
+                    >
+                        Menu Principal
+                    </p>
+                </div>
+                {% if user.is_authenticated and user.role == 'ADMIN' %}
+                <a
+                        href="{% url 'admin_main' %}"
+                        class="flex items-center px-4 py-2.5 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors group"
+                >
           <span
-            class="material-symbols-outlined mr-3 text-gray-400 group-hover:text-blue-500"
-            >home</span
+                  class="material-symbols-outlined mr-3 text-gray-400 group-hover:text-blue-500"
+          >home</span
           >
-          <span class="font-medium">Accueil</span>
-        </a>
+                    <span class="font-medium">Accueil</span>
+                </a>
 
-        <!-- User Management Section -->
-        <div class="pt-4">
-          <p
-            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
-          >
-            Gestion Utilisateurs
-          </p>
-        </div>
+                <!-- User Management Section -->
+                <div class="pt-4">
+                    <p
+                            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
+                    >
+                        Gestion Utilisateurs
+                    </p>
+                </div>
 
-        <!-- Admin Dropdown -->
-        <div class="dropdown-group">
-          <button class="dropdown-toggle">
-            <div class="flex items-center">
+                <!-- Admin Dropdown -->
+                <div class="dropdown-group">
+                    <button class="dropdown-toggle">
+                        <div class="flex items-center">
               <span class="material-symbols-outlined mr-3"
-                >supervised_user_circle</span
+              >supervised_user_circle</span
               >
-              <span class="font-medium">Superviseurs</span>
-            </div>
-            <svg
-              class="dropdown-chevron"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              ></path>
-            </svg>
-          </button>
-          <div class="dropdown-content">
-            <a href="{% url 'creer_superviseur' %}" class="dropdown-item">
+                            <span class="font-medium">Superviseurs</span>
+                        </div>
+                        <svg
+                                class="dropdown-chevron"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                        >
+                            <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M19 9l-7 7-7-7"
+                            ></path>
+                        </svg>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="{% url 'creer_superviseur' %}" class="dropdown-item">
               <span class="material-symbols-outlined mr-3 text-sm"
-                >add_circle</span
+              >add_circle</span
               >
-              <span>Créer superviseur</span>
-            </a>
-            <a href="{% url 'liste_superviseurs' %}" class="dropdown-item">
+                            <span>Créer superviseur</span>
+                        </a>
+                        <a href="{% url 'liste_superviseurs' %}" class="dropdown-item">
               <span class="material-symbols-outlined mr-3 text-sm"
-                >list_alt</span
+              >list_alt</span
               >
-              <span>Liste superviseurs</span>
-            </a>
-          </div>
-        </div>
+                            <span>Liste superviseurs</span>
+                        </a>
+                    </div>
+                </div>
 
-        <!-- Users Dropdown -->
-        <div class="dropdown-group">
-          <button class="dropdown-toggle">
-            <div class="flex items-center">
-              <span class="material-symbols-outlined mr-3">support_agent</span>
-              <span class="font-medium">Agents</span>
-            </div>
-            <svg
-              class="dropdown-chevron"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              ></path>
-            </svg>
-          </button>
-          <div class="dropdown-content">
-            <a href="{% url 'creer_agent' %}" class="dropdown-item">
+                <!-- Users Dropdown -->
+                <div class="dropdown-group">
+                    <button class="dropdown-toggle">
+                        <div class="flex items-center">
+                            <span class="material-symbols-outlined mr-3">support_agent</span>
+                            <span class="font-medium">Agents</span>
+                        </div>
+                        <svg
+                                class="dropdown-chevron"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                        >
+                            <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M19 9l-7 7-7-7"
+                            ></path>
+                        </svg>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="{% url 'creer_agent' %}" class="dropdown-item">
               <span class="material-symbols-outlined mr-3 text-sm"
-                >person_add</span
+              >person_add</span
               >
-              <span>Créer agent</span>
-            </a>
-            <a href="{% url 'liste_agents' %}" class="dropdown-item">
-              <span class="material-symbols-outlined mr-3 text-sm">groups</span>
-              <span>Liste agents</span>
-            </a>
-          </div>
-        </div>
+                            <span>Créer agent</span>
+                        </a>
+                        <a href="{% url 'liste_agents' %}" class="dropdown-item">
+                            <span class="material-symbols-outlined mr-3 text-sm">groups</span>
+                            <span>Liste agents</span>
+                        </a>
+                    </div>
+                </div>
 
-        <!-- User Management Section -->
-        <div class="pt-4">
-          <p
-            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
-          >
-            Gestion de map
-          </p>
-        </div>
+                <!-- User Management Section -->
+                <div class="pt-4">
+                    <p
+                            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
+                    >
+                        Gestion de map
+                    </p>
+                </div>
 
-        <!-- Admin Dropdown -->
-        <div class="dropdown-group">
-          <button class="dropdown-toggle">
-            <div class="flex items-center">
+                <!-- Admin Dropdown -->
+                <div class="dropdown-group">
+                    <button class="dropdown-toggle">
+                        <div class="flex items-center">
               <span class="material-symbols-outlined mr-3"
-                >supervised_user_circle</span
+              >supervised_user_circle</span
               >
-              <span class="font-medium">map</span>
-            </div>
-            <svg
-              class="dropdown-chevron"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              ></path>
-            </svg>
-          </button>
-          <div class="dropdown-content">
-            <a href="{% url 'index' %}" class="dropdown-item">
+                            <span class="font-medium">map</span>
+                        </div>
+                        <svg
+                                class="dropdown-chevron"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                        >
+                            <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M19 9l-7 7-7-7"
+                            ></path>
+                        </svg>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="{% url 'index' %}" class="dropdown-item">
               <span class="material-symbols-outlined mr-3 text-sm"
-                >add_circle</span
+              >add_circle</span
               >
-              <span>voir map</span>
-            </a>
-            <a href="{% url 'liste_superviseurs' %}" class="dropdown-item">
+                            <span>voir map</span>
+                        </a>
+                        <a href="{% url 'liste_superviseurs' %}" class="dropdown-item">
               <span class="material-symbols-outlined mr-3 text-sm"
-                >list_alt</span
+              >list_alt</span
               >
-              <span>Liste superviseurs</span>
-            </a>
-          </div>
-        </div>
+                            <span>Liste superviseurs</span>
+                        </a>
+                    </div>
+                </div>
 
-        {% elif user.is_authenticated and user.role == 'SUPER' %}
-        <a
-          href="{% url 'admin_main' %}"
-          class="flex items-center px-4 py-2.5 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors group"
-        >
+                {% elif user.is_authenticated and user.role == 'SUPER' %}
+                <a
+                        href="{% url 'admin_main' %}"
+                        class="flex items-center px-4 py-2.5 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors group"
+                >
           <span
-            class="material-symbols-outlined mr-3 text-gray-400 group-hover:text-blue-500"
-            >home</span
+                  class="material-symbols-outlined mr-3 text-gray-400 group-hover:text-blue-500"
+          >home</span
           >
-          <span class="font-medium">Accueil</span>
-        </a>
+                    <span class="font-medium">Accueil</span>
+                </a>
 
-        <!-- User Management Section -->
-        <div class="pt-4">
-          <p
-            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
-          >
-            Gestion Utilisateurs
-          </p>
-        </div>
-        <div class="dropdown-group">
-          <button class="dropdown-toggle">
-            <div class="flex items-center">
-              <span class="material-symbols-outlined mr-3">support_agent</span>
-              <span class="font-medium">Agents</span>
-            </div>
-            <svg
-              class="dropdown-chevron"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              ></path>
-            </svg>
-          </button>
-          <div class="dropdown-content">
-            <a href="{% url 'creer_agent' %}" class="dropdown-item">
+                <!-- User Management Section -->
+                <div class="pt-4">
+                    <p
+                            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
+                    >
+                        Gestion Utilisateurs
+                    </p>
+                </div>
+                <div class="dropdown-group">
+                    <button class="dropdown-toggle">
+                        <div class="flex items-center">
+                            <span class="material-symbols-outlined mr-3">support_agent</span>
+                            <span class="font-medium">Agents</span>
+                        </div>
+                        <svg
+                                class="dropdown-chevron"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                        >
+                            <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M19 9l-7 7-7-7"
+                            ></path>
+                        </svg>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="{% url 'creer_agent' %}" class="dropdown-item">
               <span class="material-symbols-outlined mr-3 text-sm"
-                >person_add</span
+              >person_add</span
               >
-              <span>Créer agent</span>
-            </a>
-            <a href="{% url 'liste_agents' %}" class="dropdown-item">
-              <span class="material-symbols-outlined mr-3 text-sm">groups</span>
-              <span>Liste agents</span>
-            </a>
-          </div>
-        </div>
-        <div class="pt-4">
-          <p
-            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
-          >
-            Gestion Secteurs
-          </p>
-        </div>
+                            <span>Créer agent</span>
+                        </a>
+                        <a href="{% url 'liste_agents' %}" class="dropdown-item">
+                            <span class="material-symbols-outlined mr-3 text-sm">groups</span>
+                            <span>Liste agents</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="pt-4">
+                    <p
+                            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
+                    >
+                        Gestion Secteurs
+                    </p>
+                </div>
 
-        <div class="dropdown-group">
-          <button class="dropdown-toggle">
-            <div class="flex items-center">
-              <span class="material-symbols-outlined mr-3">support_agent</span>
-              <span class="font-medium">Secteurs</span>
-            </div>
-            <svg
-              class="dropdown-chevron"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              ></path>
-            </svg>
-          </button>
-          <div class="dropdown-content">
-            <a href="{% url 'liste_agents' %}" class="dropdown-item">
+                <div class="dropdown-group">
+                    <button class="dropdown-toggle">
+                        <div class="flex items-center">
+                            <span class="material-symbols-outlined mr-3">support_agent</span>
+                            <span class="font-medium">Secteurs</span>
+                        </div>
+                        <svg
+                                class="dropdown-chevron"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                        >
+                            <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M19 9l-7 7-7-7"
+                            ></path>
+                        </svg>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="{% url 'liste_agents' %}" class="dropdown-item">
               <span class="material-symbols-outlined mr-3 text-sm"
-                >person_add</span
+              >person_add</span
               >
-              <span>Créer secteur</span>
-            </a>
-            <a href="{% url 'liste_agents' %}" class="dropdown-item">
-              <span class="material-symbols-outlined mr-3 text-sm">groups</span>
-              <span>Liste secteurs</span>
-            </a>
-          </div>
-        </div>
+                            <span>Créer secteur</span>
+                        </a>
+                        <a href="{% url 'liste_agents' %}" class="dropdown-item">
+                            <span class="material-symbols-outlined mr-3 text-sm">groups</span>
+                            <span>Liste secteurs</span>
+                        </a>
+                    </div>
+                </div>
 
-        {% else %}
-        <div class="dropdown-group">
-          <button class="dropdown-toggle">
-            <div class="flex items-center">
-              <span class="material-symbols-outlined mr-3">support_agent</span>
-              <span class="font-medium">Secteurs</span>
-            </div>
-            <svg
-              class="dropdown-chevron"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              ></path>
-            </svg>
-          </button>
-          <div class="dropdown-content">
-            <a href="{% url '#' %}" class="dropdown-item">
+                {% else %}
+                <div class="dropdown-group">
+                    <button class="dropdown-toggle">
+                        <div class="flex items-center">
+                            <span class="material-symbols-outlined mr-3">support_agent</span>
+                            <span class="font-medium">Secteurs</span>
+                        </div>
+                        <svg
+                                class="dropdown-chevron"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                        >
+                            <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M19 9l-7 7-7-7"
+                            ></path>
+                        </svg>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="{% url 'admin_main' %}" class="dropdown-item">
               <span class="material-symbols-outlined mr-3 text-sm"
-                >person_add</span
+              >person_add</span
               >
-              <span>Créer secteur</span>
-            </a>
-            <a href="{% url '#' %}" class="dropdown-item">
-              <span class="material-symbols-outlined mr-3 text-sm">groups</span>
-              <span>Liste secteurs</span>
-            </a>
-          </div>
+                            <span>Créer secteur</span>
+                        </a>
+                        <a href="{% url 'get_polygons' %}" class="dropdown-item">
+                            <span class="material-symbols-outlined mr-3 text-sm">groups</span>
+                            <span>Liste secteurs</span>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </nav>
         </div>
-        {% endif %}
-      </nav>
     </div>
-  </div>
 </aside>
 
 <!-- Mobile Menu Overlay -->
 <div id="mobile-menu" class="fixed inset-0 z-40 hidden">
-  <div
-    class="absolute inset-0 bg-gray-600 bg-opacity-75 transition-opacity"
-  ></div>
-  <div
-    class="relative flex flex-col w-full max-w-xs h-full bg-white mobile-menu shadow-xl"
-  >
     <div
-      class="flex items-center justify-between h-16 px-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white"
+            class="absolute inset-0 bg-gray-600 bg-opacity-75 transition-opacity"
+    ></div>
+    <div
+            class="relative flex flex-col w-full max-w-xs h-full bg-white mobile-menu shadow-xl"
     >
-      <a href="/" class="flex items-center">
-        <span class="text-xl font-bold text-gray-800">Smart</span>
-        <span class="text-xl font-semibold text-blue-600">Vision</span>
-      </a>
-      <button
-        id="close-mobile-menu"
-        class="p-1 rounded-md text-gray-500 hover:text-gray-700 focus:outline-none"
-      >
-        <svg
-          class="w-6 h-6"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+        <div
+                class="flex items-center justify-between h-16 px-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white"
         >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M6 18L18 6M6 6l12 12"
-          ></path>
-        </svg>
-      </button>
-    </div>
-    <div class="px-4 py-4 overflow-y-auto custom-scrollbar">
-      <!-- Mobile menu content (same as desktop sidebar) -->
-      <nav class="space-y-1">
-        <!-- Main Menu Section -->
-        <div class="pt-2">
-          <p
-            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
-          >
-            Menu Principal
-          </p>
+            <a href="/" class="flex items-center">
+                <span class="text-xl font-bold text-gray-800">Smart</span>
+                <span class="text-xl font-semibold text-blue-600">Vision</span>
+            </a>
+            <button
+                    id="close-mobile-menu"
+                    class="p-1 rounded-md text-gray-500 hover:text-gray-700 focus:outline-none"
+            >
+                <svg
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                >
+                    <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12"
+                    ></path>
+                </svg>
+            </button>
         </div>
-        <a
-          href="{% url 'creer_superviseur' %}"
-          class="flex items-center px-4 py-2.5 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors group"
-        >
+        <div class="px-4 py-4 overflow-y-auto custom-scrollbar">
+            <!-- Mobile menu content (same as desktop sidebar) -->
+            <nav class="space-y-1">
+                <!-- Main Menu Section -->
+                <div class="pt-2">
+                    <p
+                            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
+                    >
+                        Menu Principal
+                    </p>
+                </div>
+                <a
+                        href="{% url 'creer_superviseur' %}"
+                        class="flex items-center px-4 py-2.5 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors group"
+                >
           <span
-            class="material-symbols-outlined mr-3 text-gray-400 group-hover:text-blue-500"
-            >home</span
+                  class="material-symbols-outlined mr-3 text-gray-400 group-hover:text-blue-500"
+          >home</span
           >
-          <span class="font-medium">Accueil</span>
-        </a>
+                    <span class="font-medium">Accueil</span>
+                </a>
 
-        <!-- User Management Section -->
-        <div class="pt-4">
-          <p
-            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
-          >
-            Gestion Utilisateurs
-          </p>
-        </div>
+                <!-- User Management Section -->
+                <div class="pt-4">
+                    <p
+                            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
+                    >
+                        Gestion Utilisateurs
+                    </p>
+                </div>
 
-        <!-- Admin Dropdown -->
-        <div class="dropdown-group">
-          <button class="dropdown-toggle">
-            <div class="flex items-center">
+                <!-- Admin Dropdown -->
+                <div class="dropdown-group">
+                    <button class="dropdown-toggle">
+                        <div class="flex items-center">
               <span class="material-symbols-outlined mr-3"
-                >supervised_user_circle</span
+              >supervised_user_circle</span
               >
-              <span class="font-medium">Superviseurs</span>
-            </div>
-            <svg
-              class="dropdown-chevron"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              ></path>
-            </svg>
-          </button>
-          <div class="dropdown-content">
-            <a href="{% url 'creer_superviseur' %}" class="dropdown-item">
+                            <span class="font-medium">Superviseurs</span>
+                        </div>
+                        <svg
+                                class="dropdown-chevron"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                        >
+                            <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M19 9l-7 7-7-7"
+                            ></path>
+                        </svg>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="{% url 'creer_superviseur' %}" class="dropdown-item">
               <span class="material-symbols-outlined mr-3 text-sm"
-                >add_circle</span
+              >add_circle</span
               >
-              <span>Créer superviseur</span>
-            </a>
-            <a href="{% url 'liste_superviseurs' %}" class="dropdown-item">
+                            <span>Créer superviseur</span>
+                        </a>
+                        <a href="{% url 'liste_superviseurs' %}" class="dropdown-item">
               <span class="material-symbols-outlined mr-3 text-sm"
-                >list_alt</span
+              >list_alt</span
               >
-              <span>Liste superviseurs</span>
-            </a>
-          </div>
-        </div>
+                            <span>Liste superviseurs</span>
+                        </a>
+                    </div>
+                </div>
 
-        <!-- Users Dropdown -->
-        <div class="dropdown-group">
-          <button class="dropdown-toggle">
-            <div class="flex items-center">
-              <span class="material-symbols-outlined mr-3">support_agent</span>
-              <span class="font-medium">Agents</span>
-            </div>
-            <svg
-              class="dropdown-chevron"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              ></path>
-            </svg>
-          </button>
-          <div class="dropdown-content">
-            <a href="{% url 'creer_agent' %}" class="dropdown-item">
+                <!-- Users Dropdown -->
+                <div class="dropdown-group">
+                    <button class="dropdown-toggle">
+                        <div class="flex items-center">
+                            <span class="material-symbols-outlined mr-3">support_agent</span>
+                            <span class="font-medium">Agents</span>
+                        </div>
+                        <svg
+                                class="dropdown-chevron"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                        >
+                            <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M19 9l-7 7-7-7"
+                            ></path>
+                        </svg>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="{% url 'creer_agent' %}" class="dropdown-item">
               <span class="material-symbols-outlined mr-3 text-sm"
-                >person_add</span
+              >person_add</span
               >
-              <span>Créer agent</span>
-            </a>
-            <a href="{% url 'liste_agents' %}" class="dropdown-item">
-              <span class="material-symbols-outlined mr-3 text-sm">groups</span>
-              <span>Liste agents</span>
-            </a>
-          </div>
+                            <span>Créer agent</span>
+                        </a>
+                        <a href="{% url 'liste_agents' %}" class="dropdown-item">
+                            <span class="material-symbols-outlined mr-3 text-sm">groups</span>
+                            <span>Liste agents</span>
+                        </a>
+                    </div>
+                </div>
+            </nav>
         </div>
-      </nav>
     </div>
-  </div>
 </div>
