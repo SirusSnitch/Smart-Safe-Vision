@@ -216,3 +216,19 @@ def video_player(request):
 
 def live_stream(request):
     return render(request, 'live_stream.html')
+
+def all_cameras_stream(request):
+    departement_id = request.GET.get('departement_id')
+    departements = Lieu.objects.all()  # Tous les départements (Lieu)
+
+    if departement_id:
+        cameras = Camera.objects.filter(department_id=departement_id)
+    else:
+        cameras = Camera.objects.all()
+
+    context = {
+        'cameras': cameras,
+        'departements': departements,
+        'selected_departement_id': departement_id,
+    }
+    return render(request, 'all_cameras.html', context)

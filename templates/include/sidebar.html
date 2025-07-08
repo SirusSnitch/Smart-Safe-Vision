@@ -139,6 +139,45 @@
             Gestion de map
           </p>
         </div>
+        <!-- Camera Section -->
+        <div class="pt-4">
+          <p
+            class="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase"
+          >
+            Caméras
+          </p>
+        </div>
+
+        <!-- Cameras Dropdown -->
+        <div class="dropdown-group">
+          <button class="dropdown-toggle">
+            <div class="flex items-center">
+              <span class="material-symbols-outlined mr-3">videocam</span>
+              <span class="font-medium">Caméras</span>
+            </div>
+            <svg
+              class="dropdown-chevron"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+          <div class="dropdown-content">
+            <a href="{% url 'all_cameras_stream' %}" class="dropdown-item">
+              <span class="material-symbols-outlined mr-3 text-sm"
+                >live_tv</span
+              >
+              <span>Toutes les caméras</span>
+            </a>
+          </div>
+        </div>
 
         <!-- Admin Dropdown -->
         <div class="dropdown-group">
@@ -169,12 +208,6 @@
                 >add_circle</span
               >
               <span>voir map</span>
-            </a>
-            <a href="{% url 'liste_superviseurs' %}" class="dropdown-item">
-              <span class="material-symbols-outlined mr-3 text-sm"
-                >list_alt</span
-              >
-              <span>Liste superviseurs</span>
             </a>
           </div>
         </div>

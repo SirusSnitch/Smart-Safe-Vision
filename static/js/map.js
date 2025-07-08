@@ -607,9 +607,10 @@ function initMap(urlConfig) {
               }),
             });
             marker.bindPopup(`
-  <div style="width: 640px; height: 360px;">
+  <div style="width: 320px; height: 240px;">
     <strong>${props.name}</strong><br>
-    <img src="${props.url}" width="300" height="360" alt="Flux caméra MJPEG" />
+    <video width="300" height="200" controls autoplay data-src="${props.url}" muted></video>
+    <p style="font-size: 0.85em; color: gray;">${props.url}</p>
   </div>
 `);
 
@@ -628,6 +629,31 @@ function initMap(urlConfig) {
         showToast("Erreur lors du chargement des caméras", "error");
       });
   }
+  map.on("popupopen", function (e) {
+    const popupEl = e.popup.getElement();
+    const video = popupEl.querySelector("video");
+
+    if (!video) return;
+
+    const streamUrl = video.getAttribute("data-src");
+
+    if (Hls.isSupported()) {
+      const hls = new Hls();
+      hls.loadSource(streamUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, function () {
+        video.play();
+      });
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = streamUrl;
+      video.addEventListener("loadedmetadata", () => {
+        video.play();
+      });
+    } else {
+      popupEl.innerHTML +=
+        "<p style='color:red'>Votre navigateur ne supporte pas le streaming HLS.</p>";
+    }
+  });
 
   function deleteCamera(id) {
     return fetch(`/delete_camera/${id}/`, {
