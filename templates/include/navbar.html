@@ -1,44 +1,75 @@
 <!-- Top Navigation -->
 <header class="bg-white shadow-sm z-30">
-    <div class="flex items-center justify-between px-4 py-3">
-        <!-- Mobile menu button -->
-        <button id="open-mobile-menu" class="p-1 text-gray-500 rounded-md md:hidden hover:text-gray-700 focus:outline-none">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-            </svg>
-        </button>
+  <div class="flex items-center justify-between px-4 py-3">
+    <!-- Mobile menu button -->
+    <button
+      id="open-mobile-menu"
+      class="p-1 text-gray-500 rounded-md md:hidden hover:text-gray-700 focus:outline-none"
+    >
+      <svg
+        class="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M4 6h16M4 12h16M4 18h16"
+        ></path>
+      </svg>
+    </button>
 
-        <!-- Right side (user dropdown and notifications) -->
-        <div class="flex items-center space-x-4 ml-auto">
-            <!-- Notifications -->
-            <button class="p-1 text-gray-500 rounded-full hover:text-gray-700 focus:outline-none relative">
-                <span class="material-symbols-outlined">notifications</span>
-                <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+    <!-- Right side (user dropdown and notifications) -->
+    <div class="flex items-center space-x-4 ml-auto">
+      <!-- Notifications -->
+      <button
+        class="p-1 text-gray-500 rounded-full hover:text-gray-700 focus:outline-none relative"
+      >
+        <span class="material-symbols-outlined">notifications</span>
+        <span
+          class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"
+        ></span>
+      </button>
 
-            <!-- User dropdown -->
-            <div class="relative">
-                <button id="user-menu-button" class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    <img class="w-8 h-8 rounded-full" src="https://via.placeholder.com/40" alt="User">
-                </button>
+      <!-- User dropdown -->
+      <div class="relative">
+        <button
+          id="user-menu-button"
+          class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        ></button>
 
-                <!-- Dropdown menu -->
-                <div id="user-dropdown" class="absolute right-0 hidden w-48 py-1 mt-2 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-40">
-                    <div class="px-4 py-3 border-b border-gray-100">
-                        <p class="text-sm font-medium text-gray-900">{{ user.role }}</p>
-                        <p class="text-xs text-gray-500">{{ user.first_name }}</p>
-                    </div>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-                        <span class="material-symbols-outlined align-middle mr-2 text-base">account_circle</span>
-                        Mon Profil
-                    </a>
-                    <div class="border-t border-gray-100"></div>
-                    <a href="{% url 'logOut' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-                        <span class="material-symbols-outlined align-middle mr-2 text-base">logout</span>
-                        Déconnexion
-                    </a>
-                </div>
-            </div>
+        <!-- Dropdown menu -->
+        <div
+          id="user-dropdown"
+          class="absolute right-0 hidden w-48 py-1 mt-2 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-40"
+        >
+          <div class="px-4 py-3 border-b border-gray-100">
+            <p class="text-sm font-medium text-gray-900">{{ user.role }}</p>
+            <p class="text-xs text-gray-500">{{ user.first_name }}</p>
+          </div>
+          <a
+            href="#"
+            class="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+          >
+            <span class="material-symbols-outlined align-middle mr-2 text-base"
+              >account_circle</span
+            >
+            Mon Profil
+          </a>
+          <div class="border-t border-gray-100"></div>
+          <a
+            href="{% url 'logOut' %}"
+            class="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+          >
+            <span class="material-symbols-outlined align-middle mr-2 text-base"
+              >logout</span
+            >
+            Déconnexion
+          </a>
         </div>
+      </div>
     </div>
+  </div>
 </header>

@@ -138,6 +138,8 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),  # Où sont tes fichiers statiques sources (dev)
+        os.path.join(BASE_DIR, 'public'),  # ici, tu ajoutes le dossier public pour servir HLS
+
 ]
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Où collecter les fichiers statiques (prod)
