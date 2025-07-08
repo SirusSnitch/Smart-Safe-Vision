@@ -606,12 +606,12 @@ function initMap(urlConfig) {
                 popupAnchor: [0, -30],
               }),
             });
-
             marker.bindPopup(`
-            <strong>${props.name}</strong><br>
-            <a href="${props.url}" target="_blank">Voir la caméra</a><br>
-            Département: ${props.department_name || "Aucun"}
-          `);
+  <div style="width: 640px; height: 360px;">
+    <strong>${props.name}</strong><br>
+    <img src="${props.url}" width="300" height="360" alt="Flux caméra MJPEG" />
+  </div>
+`);
 
             cameraLayer.addLayer(marker);
 

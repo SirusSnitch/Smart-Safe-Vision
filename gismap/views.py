@@ -213,3 +213,6 @@ def delete_camera(request, camera_id):
     
 def video_player(request):
     return render(request, 'video.html')
+
+def live_stream(request):
+    return render(request, 'live_stream.html')

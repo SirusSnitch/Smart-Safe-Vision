@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import index, save_polygon, get_polygons, delete_polygon, get_isgb_polygon, get_cameras, delete_camera,save_camera,video_player
+from .views import index, save_polygon, get_polygons, delete_polygon,get_isgb_polygon, get_cameras, delete_camera,save_camera,video_player,live_stream
 
 urlpatterns = [
     path('', index, name='index'),
@@ -12,5 +12,6 @@ urlpatterns = [
     path('save_camera/', save_camera, name='save_camera'),
         path('video/', video_player, name='video_player'),
 
+    path('live/', live_stream, name='live_stream'),
 
 ]
