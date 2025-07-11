@@ -279,7 +279,7 @@
                     <button class="dropdown-toggle">
                         <div class="flex items-center">
                             <span class="material-symbols-outlined mr-3">support_agent</span>
-                            <span class="font-medium">Secteurs</span>
+                            <span class="font-medium">Caméras Secteur</span>
                         </div>
                         <svg
                                 class="dropdown-chevron"
@@ -296,15 +296,11 @@
                         </svg>
                     </button>
                     <div class="dropdown-content">
-                        <a href="{% url 'admin_main' %}" class="dropdown-item">
+                        <a href="{% url 'camera-list' %}" class="dropdown-item">
               <span class="material-symbols-outlined mr-3 text-sm"
               >person_add</span
               >
-                            <span>Créer secteur</span>
-                        </a>
-                        <a href="{% url 'get_polygons' %}" class="dropdown-item">
-                            <span class="material-symbols-outlined mr-3 text-sm">groups</span>
-                            <span>Liste secteurs</span>
+                            <span>Caméras</span>
                         </a>
                     </div>
                 </div>

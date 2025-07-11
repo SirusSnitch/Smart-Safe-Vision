@@ -31,7 +31,6 @@ def process_camera_stream(camera_id, camera_url):
             time.sleep(1)
             continue
 
-        # تقدر تعمل هنا معالجة ذكاء صناعي، تخزين، إرسال ...
         print(f"[{camera_id}] Frame reçu")
 
         time.sleep(0.03)  # simulate 30 fps

@@ -1,6 +1,6 @@
 from django.urls import path
 from authentification.views.authAdmin import *
-
+from authentification.views.authAgent import *
 urlpatterns = [
 
    # Urls Admin
@@ -20,6 +20,7 @@ urlpatterns = [
    path('agents/modifier/<int:agent_id>/', modifier_agent, name='modifier_agent'),
    path('agents/supprimer/<int:agent_id>/', supprimer_agent, name='supprimer_agent'),
    path('password-reset/', password_reset_request, name='password_reset'),
+   path('cameras/', camera_list, name='camera-list'),
 
 
 
