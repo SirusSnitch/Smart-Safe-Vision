@@ -47,10 +47,17 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_gis',
         "channels",
+            'django_celery_beat',
+
 
 
 
 ]
+CELERY_BEAT_SCHEDULE = {
+    'capture-cameras-every-30-seconds': {
+        'task': 'gismap.tasks.capture_all_cameras_once',
+        'schedule': 30.0,  # toutes les 30 secondes
+    },}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -172,3 +179,6 @@ GDAL_LIBRARY_PATH = r"C:\OSGeo4W\bin\gdal311.dll"
 GEOS_LIBRARY_PATH = r"C:\OSGeo4W\bin\geos_c.dll"
 
 
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
