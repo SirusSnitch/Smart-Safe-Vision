@@ -10,7 +10,63 @@ import traceback
 from django.views.decorators.http import require_http_methods
 from django.core.serializers import serialize
 from django.contrib.gis.serializers import geojson  # ajoute ceci
+from urllib.parse import urlparse
+import subprocess
 
+
+import os
+import cv2
+import threading
+import time
+from datetime import datetime
+
+def generate_hls_url(rtsp_url):
+    """Convertit une URL RTSP en HLS avec MediaMTX"""
+    parsed = urlparse(rtsp_url)
+    stream_name = parsed.path.split('/')[-1]  # Récupère le nom du flux (ex: 'stream1')
+    return f"http://192.168.1.11:8888/{stream_name}/index.m3u8"
+def process_camera_stream(camera_id, rtsp_url):
+    print(f"[{camera_id}] Started processing thread for {rtsp_url}")
+    cap = cv2.VideoCapture(rtsp_url)
+
+    if not cap.isOpened():
+        print(f"[{camera_id}] Échec de la connexion au flux")
+        return
+
+    camera_dir = f"media/captures/camera_{camera_id}"
+    os.makedirs(camera_dir, exist_ok=True)
+
+    last_saved = time.time()
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print(f"[{camera_id}] Frame non reçue")
+            time.sleep(1)
+            continue
+
+        now = time.time()
+        if now - last_saved >= 30:  # 30 secondes
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{camera_dir}/frame_{timestamp}.jpg"
+            cv2.imwrite(filename, frame)
+            print(f"[{camera_id}] Image enregistrée: {filename}")
+            last_saved = now
+
+        # Limite la charge CPU
+        time.sleep(0.03)
+
+
+running_threads = {}
+def start_camera_thread(id, url):
+    if id not in running_threads:
+        t = threading.Thread(target=process_camera_stream, args=(id, url), daemon=True)
+        t.start()
+        running_threads[id] = t
+        print(f"[INFO] Thread caméra {id} lancé. Threads actifs : {threading.active_count()}")
+        print(f"[DEBUG] Threads caméras en cours : {list(running_threads.keys())}")
+    else:
+        print(f"[INFO] Le thread pour la caméra {id} est déjà en cours.")
 
 
 
@@ -130,10 +186,11 @@ def save_camera(request):
         try:
             data = json.loads(request.body)
             name = data.get('name')
-            url = data.get('url')
+            rtsp_url = data.get('url')
+            hls_url = generate_hls_url(rtsp_url)  #
             coordinates = data.get('coordinates')  # [lng, lat]
 
-            if not name or not url or not coordinates:
+            if not name or not hls_url or not coordinates:
                 return JsonResponse({'error': 'Name, URL, and coordinates are required'}, status=400)
 
             point = Point(coordinates[0], coordinates[1])
@@ -154,11 +211,12 @@ def save_camera(request):
 
             camera = Camera.objects.create(
                 name=name,
-                url=url,
+                rtsp_url=rtsp_url,
+                hls_url=hls_url,
                 location=point,
                 department=department
             )
-
+            start_camera_thread(camera.id, rtsp_url)
             return JsonResponse({
                 'status': 'success',
                 'message': 'Camera saved successfully',
@@ -225,6 +283,11 @@ def all_cameras_stream(request):
         cameras = Camera.objects.filter(department_id=departement_id)
     else:
         cameras = Camera.objects.all()
+
+    # Démarrer les threads pour les caméras qui n'ont pas encore de thread actif
+    for camera in cameras:
+        if camera.id not in running_threads:
+            start_camera_thread(camera.id, camera.rtsp_url)
 
     context = {
         'cameras': cameras,
