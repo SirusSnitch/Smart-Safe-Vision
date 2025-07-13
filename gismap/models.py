@@ -13,7 +13,8 @@ class Lieu(models.Model):
 
 class Camera(models.Model):
     name = models.CharField(max_length=100)
-    url = models.URLField()
+    rtsp_url = models.URLField()
+    hls_url = models.URLField()
     location = models.PointField()
     department = models.ForeignKey(Lieu, on_delete=models.SET_NULL, null=True, blank=True, related_name='cameras')
 

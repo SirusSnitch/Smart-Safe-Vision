@@ -46,6 +46,8 @@ INSTALLED_APPS = [
        
     'rest_framework',
     'rest_framework_gis',
+        "channels",
+
 
 
 ]
@@ -79,7 +81,9 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'smartVision.wsgi.application'
+#WSGI_APPLICATION = 'smartVision.wsgi.application'
+ASGI_APPLICATION = "smartVision.application"
+
 
 AUTH_USER_MODEL = 'authentification.User'
 
@@ -142,11 +146,11 @@ STATICFILES_DIRS = [
 
 ]
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Où collecter les fichiers statiques (prod)
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Dossier pour collectstatic
 
 #Media
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -166,3 +170,5 @@ EMAIL_HOST_PASSWORD = 'cgev gbwc hugo bxtz'
 
 GDAL_LIBRARY_PATH = r"C:\OSGeo4W\bin\gdal311.dll"
 GEOS_LIBRARY_PATH = r"C:\OSGeo4W\bin\geos_c.dll"
+
+
