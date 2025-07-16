@@ -53,11 +53,15 @@ INSTALLED_APPS = [
 
 
 ]
+from celery.schedules import crontab
+
 CELERY_BEAT_SCHEDULE = {
-    'capture-cameras-every-30-seconds': {
-        'task': 'gismap.tasks.capture_all_cameras_once',
-        'schedule': 30.0,  # toutes les 30 secondes
-    },}
+    'stream-all-cameras-every-30-seconds': {
+        'task': 'gismap.streaming_tasks.stream_all_rtsp_cameras',
+        'schedule': 30.0,
+    },
+}
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

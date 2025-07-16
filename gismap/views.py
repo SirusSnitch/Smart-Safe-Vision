@@ -12,7 +12,7 @@ from django.core.serializers import serialize
 from django.contrib.gis.serializers import geojson  # ajoute ceci
 from urllib.parse import urlparse
 import subprocess
-from .tasks import capture_frame
+from .streaming_tasks import stream_camera
 
 
 import os
@@ -25,7 +25,7 @@ def generate_hls_url(rtsp_url):
     """Convertit une URL RTSP en HLS avec MediaMTX"""
     parsed = urlparse(rtsp_url)
     stream_name = parsed.path.split('/')[-1]  # Récupère le nom du flux (ex: 'stream1')
-    return f"http://192.168.1.15:8888/{stream_name}/index.m3u8"
+    return f"http://192.168.1.30:8888/{stream_name}/index.m3u8"
 def process_camera_stream(camera_id, rtsp_url):
     print(f"[{camera_id}] Started processing thread for {rtsp_url}")
     cap = cv2.VideoCapture(rtsp_url)
