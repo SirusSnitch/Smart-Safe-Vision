@@ -12,7 +12,7 @@ from django.core.serializers import serialize
 from django.contrib.gis.serializers import geojson  # ajoute ceci
 from urllib.parse import urlparse
 import subprocess
-from .streaming_tasks import stream_camera
+#from tasks.streaming_tasks import stream_camera
 
 
 import os
