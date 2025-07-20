@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import sign_in, index, save_polygon, get_polygons, delete_polygon, get_isgb_polygon, get_cameras, delete_camera, save_camera
+from .views import index, save_polygon, get_polygons, delete_polygon,get_isgb_polygon, get_cameras, delete_camera,save_camera,video_player,live_stream,all_cameras_stream, sign_in
+
 
 urlpatterns = [
     path('', sign_in, name='sign_in'),  # Login page par défaut
@@ -11,4 +12,8 @@ urlpatterns = [
     path('get_cameras/', get_cameras, name='get_cameras'),
     path('delete_camera/<int:camera_id>/', delete_camera, name='delete_camera'),
     path('save_camera/', save_camera, name='save_camera'),
+    path('video/', video_player, name='video_player'),
+    path('live/', live_stream, name='live_stream'),
+    path('all-cameras/', all_cameras_stream, name='all_cameras_stream'),
 ]
+
