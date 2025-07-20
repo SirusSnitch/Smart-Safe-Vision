@@ -252,7 +252,7 @@ def get_cameras(request):
                     "properties": {
                         "id": cam.id,
                         "name": cam.name,
-                        "url": cam.url,
+                        "rtsp_url": cam.rtsp_url,
                         "department_id": cam.department.id if cam.department else None,
                         "department_name": cam.department.name if cam.department else None,
                     },
