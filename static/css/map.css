@@ -23,17 +23,7 @@ body {
     overflow: hidden;
 }
 
-/* Header Styles */
-header {
-    background: linear-gradient(135deg, var(--primary), #1a2530);
-    color: white;
-    padding: 1rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    z-index: 1000;
-}
+
 
 .logo-container {
     display: flex;
@@ -65,6 +55,10 @@ header {
 }
 
 .stats-container {
+    position: absolute !important;
+    top: 20px !important;
+    right: 300px !important; /* ajuste cette valeur selon besoin */
+    z-index: 1000 !important;
     display: flex;
     gap: 25px;
     background: rgba(255,255,255,0.1);
@@ -72,6 +66,8 @@ header {
     border-radius: 10px;
     backdrop-filter: blur(5px);
 }
+
+
 
 .stat-item {
     text-align: center;
@@ -200,12 +196,14 @@ header {
 
 /* Map Container */
 .map-container {
-    flex: 1;
-    position: relative;
+    position: relative; /* <- AJOUT IMPORTANT */
+    max-width: calc(150vw - 10px);
+    overflow: hidden;
 }
 
 #map {
-    height: 100%;
+    height: 90vh;
+    width: 100%;
     z-index: 100;
 }
 
@@ -234,18 +232,19 @@ header {
 /* Legend */
 #legend {
     position: absolute;
-    bottom: 30px;
-    right: 20px;
+    bottom: 100px;
+    left: 68%;
+    transform: translateX(-50%);
     z-index: 1000;
     background: rgba(255,255,255,0.92);
-    padding: 20px;
+    padding: 15px;
     border-radius: 12px;
     box-shadow: 0 6px 18px rgba(0,0,0,0.12);
     backdrop-filter: blur(5px);
     border: 1px solid #e0e0e0;
     max-width: 250px;
-    transition: transform 0.3s ease;
 }
+
 
 #legend.collapsed .legend-content {
     display: none;
@@ -275,7 +274,7 @@ header {
 }
 
 .legend-header h3 {
-    font-size: 1.1rem;
+    font-size: 1rem;
     color: var(--dark);
     display: flex;
     align-items: center;
@@ -315,7 +314,7 @@ header {
 }
 
 .legend-label {
-    font-size: 0.95rem;
+     font-size: 0.85rem;
     color: #2c3e50;
 }
 
@@ -472,5 +471,44 @@ header {
   color: white !important;
   font-size: 14px;
   border-radius: 6px;
+}
+
+
+
+/* Bouton pour afficher/masquer la sidebar */
+.sidebar-toggle-arrow {
+  position: absolute;
+  top: 20px;
+  left: 310px;
+  z-index: 1500;
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.main-container.collapsed .sidebar {
+   display: none;
+}
+
+.main-container.collapsed .sidebar-toggle-arrow {
+  left: 10px;
+}
+
+.main-container.collapsed .map-container {
+   width: 100%;
+   flex: 1;
+}
+
+body, html, .main-container {
+    overflow-x: hidden;
 }
 

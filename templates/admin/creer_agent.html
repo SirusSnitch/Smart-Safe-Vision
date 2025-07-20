@@ -1,3 +1,4 @@
+
 {% extends 'base.html' %}
 {% load static %}
 
@@ -124,12 +125,43 @@
                     </div>
                 </div>
 
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                    <label for="{{ form.lieu.id_for_label }}" class="md:col-span-1 font-medium text-gray-700">
+                        Secteur d'affectation <span class="text-red-500">*</span>
+                    </label>
+                    <div class="md:col-span-3">
+                        <select name="{{ form.lieu.name }}"
+                                id="{{ form.lieu.id_for_label }}"
+                                class="w-full px-3 py-2 border rounded-md {% if form.lieu.errors %}border-red-500{% else %}border-gray-300{% endif %}"
+                                required>
+                            <option value="">--- Sélectionnez un secteur ---</option>
+                            {% for secteur in form.lieu.field.queryset %}
+                                <option value="{{ secteur.pk }}" {% if form.lieu.value == secteur.pk %}selected{% endif %}>
+                                    {{ secteur.name }}
+                                </option>
+                            {% empty %}
+                                <option value="" disabled>Aucun secteur disponible</option>
+                            {% endfor %}
+                        </select>
+                        {% for error in form.lieu.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ error }}</p>
+                        {% endfor %}
+                        {% if not form.lieu.field.queryset.exists %}
+                        <p class="mt-1 text-sm text-red-600">
+                            Aucun secteur disponible. Veuillez d'abord <a href="{% url 'creer_lieu' %}" class="text-blue-600 hover:underline">créer un secteur</a>.
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+
                 <!-- Boutons -->
                 <div class="flex justify-end space-x-4 pt-4">
                     <a href="{% url 'liste_agents' %}" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">
                         <i class="fas fa-times mr-2"></i>Annuler
                     </a>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                    <button type="submit"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                            {% if not form.lieu.field.queryset.exists %}disabled{% endif %}>
                         <i class="fas fa-save mr-2"></i>Enregistrer
                     </button>
                 </div>
@@ -137,5 +169,16 @@
         </div>
     </div>
 </div>
+
+<style>
+    /* Style pour le select */
+    select {
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.5rem center;
+        background-size: 1.5em;
+    }
+</style>
 
 {% endblock %}

@@ -1,6 +1,8 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
+from django.contrib.auth import authenticate, login
+from django.contrib import messages
 import json
 from django.contrib.gis.geos import GEOSGeometry, Point
 from .models import Lieu, Camera
@@ -9,16 +11,32 @@ from django.conf import settings
 import traceback
 from django.views.decorators.http import require_http_methods
 from django.core.serializers import serialize
-from django.contrib.gis.serializers import geojson  # ajoute ceci
+from django.contrib.gis.serializers import geojson
 from urllib.parse import urlparse
 import subprocess
-
 
 import os
 import cv2
 import threading
 import time
 from datetime import datetime
+
+
+
+# ✅ Vue de connexion (sign in)
+def sign_in(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            return redirect('index')  # redirection vers la carte
+        else:
+            messages.error(request, "Email ou mot de passe incorrect.")
+
+    return render(request, 'admin/signin.html')
 
 def generate_hls_url(rtsp_url):
     """Convertit une URL RTSP en HLS avec MediaMTX"""
@@ -70,15 +88,17 @@ def start_camera_thread(id, url):
 
 
 
+
 def index(request):
-    return render(request, 'map/index.html')  # Pense à bien mettre 'map/index.html' si dans templates/map/
+    return render(request, 'map/index.html')
+
 
 @csrf_exempt
 @require_http_methods(["POST"])
 def save_polygon(request):
     try:
         data = json.loads(request.body)
-        polygon_id = data.get('id')  # ID optionnel pour update
+        polygon_id = data.get('id')
         name = data.get('name')
         geometry = data.get('geometry')
         area = data.get('area', 0)
@@ -91,7 +111,6 @@ def save_polygon(request):
             return JsonResponse({'error': 'Invalid geometry'}, status=400)
 
         if polygon_id:
-            # Update existant
             lieu = Lieu.objects.get(pk=polygon_id)
             lieu.name = name
             lieu.polygon = geom
@@ -99,16 +118,11 @@ def save_polygon(request):
             lieu.save()
             message = 'Polygon updated successfully'
         else:
-            # Création nouveau
             lieu = Lieu(name=name, polygon=geom, area=float(area))
             lieu.save()
             message = 'Polygon saved successfully'
 
-        return JsonResponse({
-            'status': 'success',
-            'message': message,
-            'id': lieu.id
-        })
+        return JsonResponse({'status': 'success', 'message': message, 'id': lieu.id})
 
     except Lieu.DoesNotExist:
         return JsonResponse({'error': 'Polygon not found'}, status=404)
@@ -131,14 +145,13 @@ def get_polygons(request):
         geojson_dict = json.loads(geojson_data)
     else:
         geojson_dict = {"type": "FeatureCollection", "features": []}
-    
+
     return JsonResponse(geojson_dict)
 
 
 @require_http_methods(["GET"])
 def get_isgb_polygon(request):
     try:
-        # Ajuste ce chemin si besoin (ici 'app/static/data/isgb.geojson')
         geojson_path = os.path.join(settings.BASE_DIR, 'app', 'static', 'data', 'isgb.geojson')
 
         if not os.path.exists(geojson_path):
@@ -176,8 +189,6 @@ def delete_polygon(request, polygon_id):
         return JsonResponse({'error': 'Polygon not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e), 'traceback': traceback.format_exc()}, status=500)
-    
-
 
 
 @csrf_exempt
@@ -229,7 +240,6 @@ def save_camera(request):
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-
 def get_cameras(request):
     if request.method == 'GET':
         try:
@@ -246,7 +256,7 @@ def get_cameras(request):
                         "department_id": cam.department.id if cam.department else None,
                         "department_name": cam.department.name if cam.department else None,
                     },
-                    "id": cam.id  # For frontend deletion
+                    "id": cam.id
                 })
             return JsonResponse({
                 "type": "FeatureCollection",
@@ -268,6 +278,7 @@ def delete_camera(request, camera_id):
         return JsonResponse({'error': 'Camera not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
     
 def video_player(request):
     return render(request, 'video.html')
