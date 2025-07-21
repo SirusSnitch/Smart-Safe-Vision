@@ -6,4 +6,3 @@ def should_start_stream(camera_id):
         running_streams.add(camera_id)
         return True
     return False
-

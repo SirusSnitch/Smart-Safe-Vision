@@ -56,6 +56,7 @@ INSTALLED_APPS = [
 from celery.schedules import crontab
 from celery.schedules import timedelta
 
+
 CELERY_BEAT_SCHEDULE = {
     'stream-all-cameras-every-30-seconds': {
         'task': 'gismap.tasks.streaming_tasks.stream_all_cameras',
