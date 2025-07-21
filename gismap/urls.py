@@ -1,5 +1,7 @@
 from django.urls import path
+
 from .views import index, save_polygon, get_polygons, delete_polygon,get_isgb_polygon, get_cameras, delete_camera,save_camera,video_player,live_stream,all_cameras_stream, sign_in
+from .streaming_views import all_cameras_stream,stream_camera_view
 
 
 urlpatterns = [
@@ -15,5 +17,6 @@ urlpatterns = [
     path('video/', video_player, name='video_player'),
     path('live/', live_stream, name='live_stream'),
     path('all-cameras/', all_cameras_stream, name='all_cameras_stream'),
+    path('stream/<int:camera_id>/', stream_camera_view, name='stream_camera_view'),
 ]
 

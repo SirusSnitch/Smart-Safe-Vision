@@ -79,16 +79,13 @@
             <h3 class="text-lg font-medium text-gray-800 ml-3 truncate">{{ cam.name }}</h3>
           </div>
           
-          <!-- Conteneur vidéo -->
+          <!-- Conteneur image MJPEG -->
           <div class="relative pb-[56.25%] bg-gray-900">
-            <video 
-              id="video-{{ forloop.counter }}" 
-              class="absolute top-0 left-0 w-full h-full"
-              controls 
-              autoplay 
-              muted 
-              playsinline>
-            </video>
+            <img 
+              src="{% url 'stream_camera_view' cam.id %}" 
+              alt="Flux live {{ cam.name }}" 
+              class="absolute top-0 left-0 w-full h-full object-cover"
+              />
           </div>
           
           <!-- Pied de carte avec heure locale -->
@@ -99,55 +96,6 @@
             </span>
             <span class="text-xs text-gray-500">{% now "H:i" %}</span>
           </div>
-          
-          <!-- Script de lecture HLS -->
-          <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<script>
-  (function() {
-    const video = document.getElementById("video-{{ forloop.counter }}");
-    const url = "{{ cam.hls_url }}"; // Utilisez l'URL HLS directement
-    console.log("HLS URL:", url); // Vérifiez l'URL dans la console
-
-    const loader = document.createElement('div');
-    loader.className = 'absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-70';
-    loader.innerHTML = `
-      <div class="text-center">
-        <div class="w-10 h-10 border-t-2 border-primary border-solid rounded-full animate-spin mx-auto"></div>
-        <p class="text-white text-xs mt-2">Chargement...</p>
-      </div>
-    `;
-    video.parentNode.appendChild(loader);
-
-    if (Hls.isSupported()) {
-      const hls = new Hls();
-      hls.loadSource(url);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, function() {
-        video.play();
-        loader.remove();
-      });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = url;
-      video.addEventListener("loadedmetadata", function() {
-        video.play();
-        loader.remove();
-      });
-    } else {
-      loader.innerHTML = `
-        <div class="p-4 text-center">
-          <div class="text-red-500 mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <p class="text-white font-medium">Navigateur non compatible</p>
-          <p class="text-gray-300 text-sm mt-1">Utilisez Chrome ou Firefox</p>
-        </div>
-      `;
-    }
-  })();
-</script>
-
         </div>
       {% empty %}
         <!-- Message quand aucune caméra n'est disponible -->
