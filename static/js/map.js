@@ -609,8 +609,8 @@ function initMap(urlConfig) {
             marker.bindPopup(`
   <div style="width: 320px; height: 240px;">
     <strong>${props.name}</strong><br>
-    <video width="300" height="200" controls autoplay data-src="${props.url}" muted></video>
-    <p style="font-size: 0.85em; color: gray;">${props.url}</p>
+    <video width="300" height="200" controls autoplay data-src="${props.rtsp_url}" muted></video>
+    <p style="font-size: 0.85em; color: gray;">${props.rtsp_url}</p>
   </div>
 `);
 

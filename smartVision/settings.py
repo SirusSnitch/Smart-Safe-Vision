@@ -47,10 +47,26 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_gis',
         "channels",
+            'django_celery_beat',
+
 
 
 
 ]
+from celery.schedules import crontab
+from celery.schedules import timedelta
+
+
+CELERY_BEAT_SCHEDULE = {
+    'stream-all-cameras-every-30-seconds': {
+        'task': 'gismap.tasks.streaming_tasks.stream_all_cameras',
+        'schedule': timedelta(seconds=30),
+    },
+    'detect-all-cameras-every-30-seconds': {
+        'task': 'gismap.tasks.streaming_tasks.detect_all_cameras',
+        'schedule': timedelta(seconds=30),
+    },
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -172,3 +188,6 @@ GDAL_LIBRARY_PATH = r"C:\OSGeo4W\bin\gdal311.dll"
 GEOS_LIBRARY_PATH = r"C:\OSGeo4W\bin\geos_c.dll"
 
 
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'

@@ -1,6 +1,6 @@
 from django.urls import path
-from .views import index, save_polygon, get_polygons, delete_polygon,get_isgb_polygon, get_cameras, delete_camera,save_camera,video_player,live_stream,all_cameras_stream
-
+from .views import index, save_polygon, get_polygons, delete_polygon,get_isgb_polygon, get_cameras, delete_camera,save_camera,video_player,live_stream
+from .streaming_views import all_cameras_stream,stream_camera_view
 urlpatterns = [
     path('', index, name='index'),
     path('get-isgb-polygon/', get_isgb_polygon, name='get_isgb_polygon'),
@@ -13,7 +13,8 @@ urlpatterns = [
         path('video/', video_player, name='video_player'),
 
     path('live/', live_stream, name='live_stream'),
-        path('all-cameras/', all_cameras_stream, name='all_cameras_stream'),
+       path('all-cameras/', all_cameras_stream, name='all_cameras_stream'),
+    path('stream/<int:camera_id>/', stream_camera_view, name='stream_camera_view'),
 
 
 ]
