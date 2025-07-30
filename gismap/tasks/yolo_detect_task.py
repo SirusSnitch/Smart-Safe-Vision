@@ -7,13 +7,23 @@ from celery import shared_task
 import redis
 import time
 import gc  # Garbage collector
+import os
+# Récupère le chemin absolu du dossier `tasks`
+current_dir = os.path.dirname(__file__)
 
+# Remonte d'un niveau vers `gismap`, puis va dans `yolo/best.pt`
+model_path = os.path.join(current_dir, "..", "yolo", "best.pt")
+
+# Normalise le chemin (résout les ..)
+model_path = os.path.abspath(model_path)
+
+# Chargement du modèle
 # Vérifier CUDA
 if not torch.cuda.is_available():
     raise RuntimeError("🚫 CUDA n'est pas disponible.")
 
 # Charger le modèle YOLOv8 nano sur GPU
-model = YOLO("yolov8n.pt").to("cuda")
+model = YOLO(model_path).to("cuda")
 
 # Connexion Redis
 r = redis.StrictRedis(host='localhost', port=6379, db=0)
@@ -27,7 +37,7 @@ def detect_from_redis(camera_id):
             encoded_frame = r.get(f"camera_frame_{camera_id}")
             if not encoded_frame:
                 print(f"[YOLO] ⏳ En attente de frame pour caméra {camera_id}")
-                time.sleep(0.5)
+                time.sleep(1)
                 continue
 
             try:
@@ -60,6 +70,7 @@ def detect_from_redis(camera_id):
                 del results
                 torch.cuda.empty_cache()
                 gc.collect()
+                time.sleep(1)  # <-- AJOUT ICI
 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     print(f"[YOLO] 🛑 Arrêt demandé par utilisateur (q)")
