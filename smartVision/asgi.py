@@ -1,21 +1,17 @@
 import os
-
-# 1. Définit d'abord DJANGO_SETTINGS_MODULE
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'smartVision.settings')
-
-# 2. Puis importe Django
 from django.core.asgi import get_asgi_application
 from django.conf import settings
 
-print("STATICFILES_DIRS[0] =", settings.STATICFILES_DIRS[0])
-print("Type of STATICFILES_DIRS[0] =", type(settings.STATICFILES_DIRS[0]))
+# Définit la variable d'environnement pour les settings Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'smartVision.settings')
 
+# Import de l'application ASGI Django classique (HTTP)
 django_asgi_app = get_asgi_application()
 
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 
-import gismap.routing
+import gismap.routing  # adapte selon ton app
 
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -26,15 +22,15 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         print(f"Response status: {response.status_code}")
         return response
 
-# Configuration simplifiée - laissons Django gérer les fichiers statiques
+# Compose le routeur ASGI pour HTTP et WebSocket
 application = ProtocolTypeRouter({
-    "http": django_asgi_app,
-    "websocket": AuthMiddlewareStack(
+    "http": django_asgi_app,  # Requête HTTP classique gérée par Django
+    "websocket": AuthMiddlewareStack(  # WebSocket avec authentification utilisateur
         URLRouter(
-            gismap.routing.websocket_urlpatterns
+            gismap.routing.websocket_urlpatterns  # URLs WebSocket définies dans gismap/routing.py
         )
     ),
 })
 
-# Ajoute le middleware de logging autour de application
+# Ajoute le middleware de logging (optionnel)
 application = LoggingMiddleware(application)

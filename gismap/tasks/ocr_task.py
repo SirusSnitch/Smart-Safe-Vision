@@ -1,294 +1,445 @@
-# ============================================================================
-# OCR_TASK.PY - Version corrigée
-# ============================================================================
-
 import pytesseract
 import cv2
 import numpy as np
-import os
-import time
-from celery import shared_task
+import redis
 import re
+from celery import shared_task
 import logging
 
-# Configuration du logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# NOUVEAUX IMPORTS POUR WEBSOCKET
+from django.apps import apps
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from django.utils import timezone
+from django.core.files.base import ContentFile
+import base64
+from django.core.files.storage import default_storage
 
-# 📍 Chemin vers tesseract.exe
+# Configuration Tesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-# 📁 Dossier debug pour plaques extraites
-debug_dir = "debug_plates"
-os.makedirs(debug_dir, exist_ok=True)
+# Redis Connection
+r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
-def preprocess_image(image):
-    """
-    Préprocessing simplifié et plus robuste pour l'OCR
-    """
-    # Agrandissement plus modéré
-    height, width = image.shape[:2]
-    if width < 200:  # Agrandir seulement si trop petite
-        scale_factor = 200 / width
-        image = cv2.resize(image, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_CUBIC)
-    
-    # Convertir en niveaux de gris
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    
-    # Débruitage léger
-    gray = cv2.medianBlur(gray, 3)
-    
-    # Amélioration du contraste simple
-    gray = cv2.convertScaleAbs(gray, alpha=1.2, beta=10)
-    
-    # Seuillage OTSU (plus fiable que adaptatif)
-    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    
-    return thresh, gray  # Retourner les deux versions
+# NOUVELLE FONCTION: Notification WebSocket
 
-def extract_license_plate_text(text):
-    """
-    Extraction optimisée pour plaques tunisiennes avec nettoyage des erreurs OCR
-    """
-    if not text:
+def send_unauthorized_notification(matricule_data):
+    """Version améliorée avec plus de debug"""
+    try:
+        channel_layer = get_channel_layer()
+        
+        if not channel_layer:
+            logging.error("❌ Channel layer non disponible")
+            return False
+        
+        notification_data = {
+            'type': 'send_notification',  # IMPORTANT: doit correspondre à la méthode du consumer
+            'data': {
+                'alert_type': 'unauthorized_plate',
+                'matricule': matricule_data['numero'],
+                'camera': matricule_data['camera_name'],
+                'location': matricule_data.get('location', 'Inconnue'),
+                'timestamp': timezone.now().isoformat(),
+                'confidence': matricule_data.get('confidence_score', 0),
+                'detection_id': matricule_data.get('detection_id', None),
+                'message': f"🚨 Matricule non autorisé: {matricule_data['numero']}"
+            }
+        }
+        
+        # Debug: vérifier les données
+        logging.info(f"📊 Données notification: {notification_data['data']}")
+        
+        # Envoi avec vérification
+        async_to_sync(channel_layer.group_send)(
+            'notifications',
+            notification_data
+        )
+        
+        logging.info(f"📢 Notification WebSocket envoyée avec succès: {matricule_data['numero']}")
+        return True
+        
+    except Exception as e:
+        logging.error(f"❌ Erreur notification WebSocket: {e}")
+        import traceback
+        logging.error(f"❌ Traceback: {traceback.format_exc()}")
+        return False
+# NOUVELLE FONCTION: Vérification et sauvegarde
+def check_and_save_detection(license_plate, camera_id, confidence_score, image_bytes=None):
+    """Vérifie autorisation et envoie notification si nécessaire"""
+    try:
+        # Import des modèles Django
+        DetectionMatricule = apps.get_model('gismap', 'DetectionMatricule')
+        MatriculeAutorise = apps.get_model('gismap', 'MatriculeAutorise')
+        Camera = apps.get_model('gismap', 'Camera')
+        
+        # Récupérer la caméra
+        camera = Camera.objects.get(id=camera_id)
+        
+        # Vérifier autorisation dans le lieu de la caméra
+        is_authorized = False
+        if camera.department:
+            is_authorized = MatriculeAutorise.objects.filter(
+                numero=license_plate,
+                lieu=camera.department
+            ).exists()
+        
+        # Sauvegarder la détection
+        detection = DetectionMatricule.objects.create(
+            numero=license_plate,
+            camera=camera,
+            est_autorise=is_authorized
+        )
+        
+        # CORRECTION: Sauvegarde image AVANT les notifications (était mal indenté)
+        if image_bytes:
+            filename = f"{timezone.now().strftime('%Y%m%d_%H%M%S')}_{license_plate}.jpg"
+            detection.image.save(filename, ContentFile(image_bytes), save=True)
+        
+        # Notification pour matricule non autorisée
+        if not is_authorized:
+            matricule_data = {
+                'numero': license_plate,
+                'camera_name': camera.name,
+                'location': camera.department.name if camera.department else 'Inconnue',
+                'confidence_score': confidence_score,
+                'detection_id': detection.id
+            }
+            
+            # 🚨 NOTIFICATION TEMPS RÉEL
+            send_unauthorized_notification(matricule_data)
+            
+            logging.warning(f"🚨 ALERTE: Matricule non autorisée {license_plate} (Cam: {camera.name})")
+        else:
+            logging.info(f"✅ Matricule autorisée: {license_plate} (Cam: {camera.name})")
+        
+        return detection, is_authorized
+        
+    except Exception as e:
+        logging.error(f"❌ Erreur vérification matricule: {e}")
+        return None, False
+
+def detect_h264_corruption(img):
+    """Détection des artifacts de corruption H.264"""
+    
+    if img is None:
+        return True
+    
+    # Conversion en niveaux de gris pour analyse
+    if len(img.shape) == 3:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = img
+    
+    height, width = gray.shape
+    
+    # 1. Vérifier les blocs corrompus (macrobloques 16x16)
+    corruption_score = 0
+    
+    # Parcourir par blocs de 16x16 (taille macrobloc H.264)
+    for y in range(0, height-16, 16):
+        for x in range(0, width-16, 16):
+            block = gray[y:y+16, x:x+16]
+            
+            # Détecter les blocs uniformes suspects (corruption commune)
+            if np.std(block) < 5:  # Bloc trop uniforme
+                corruption_score += 1
+            
+            # Détecter les transitions brutales (erreurs de décodage)
+            edges = cv2.Canny(block, 50, 150)
+            if np.sum(edges) > 1000:  # Trop d'arêtes = artifacts
+                corruption_score += 1
+    
+    total_blocks = (height//16) * (width//16)
+    corruption_ratio = corruption_score / max(total_blocks, 1)
+    
+    return corruption_ratio > 0.3  # Plus de 30% de blocs suspects
+
+def fix_h264_artifacts(img):
+    """Correction spécialisée des artifacts H.264"""
+    
+    if img is None:
         return None
+    
+    # Conversion en niveaux de gris
+    if len(img.shape) == 3:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = img.copy()
+    
+    # 1. Débruitage spécialisé pour H.264
+    # Filtre bilateral pour préserver les bords tout en supprimant le bruit de compression
+    denoised = cv2.bilateralFilter(gray, 9, 75, 75)
+    
+    # 2. Correction des artefacts de blocs
+    # Filtre gaussien léger pour lisser les transitions entre macroblocs
+    smoothed = cv2.GaussianBlur(denoised, (3, 3), 0.5)
+    
+    # 3. Reconstruction avec filtre médian pour éliminer les pixels isolés corrompus
+    median_filtered = cv2.medianBlur(smoothed, 3)
+    
+    # 4. Amélioration du contraste après débruitage
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(median_filtered)
+    
+    return enhanced
+
+def robust_preprocessing(img):
+    """Préprocessing robuste contre la corruption H.264"""
+    
+    # 1. Détection et correction des artifacts H.264
+    is_corrupted = detect_h264_corruption(img)
+    
+    if is_corrupted:
+        logging.warning("🚨 Corruption H.264 détectée - Application des corrections")
+        corrected = fix_h264_artifacts(img)
+    else:
+        # Image saine, traitement normal
+        if len(img.shape) == 3:
+            corrected = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        else:
+            corrected = img.copy()
+    
+    # 2. Redimensionnement agressif pour compenser la perte de qualité
+    height, width = corrected.shape
+    target_height = 400  # Très haute résolution
+    if height < target_height:
+        scale_factor = target_height / height
+        new_width = int(width * scale_factor * 2.5)  # Largeur très étendue
+        corrected = cv2.resize(corrected, (new_width, target_height), interpolation=cv2.INTER_LANCZOS4)
+    
+    # 3. Amélioration finale du contraste
+    # Étirement d'histogramme
+    min_val, max_val = np.percentile(corrected, [2, 98])  # Ignorer les 2% d'outliers
+    if max_val > min_val:
+        stretched = np.clip((corrected - min_val) * 255 / (max_val - min_val), 0, 255).astype(np.uint8)
+    else:
+        stretched = corrected
+    
+    # 4. Correction gamma adaptative
+    gamma = 1.3 if is_corrupted else 1.1  # Plus de correction si corruption
+    lookup_table = np.array([((i / 255.0) ** (1.0 / gamma)) * 255 for i in np.arange(0, 256)]).astype("uint8")
+    gamma_corrected = cv2.LUT(stretched, lookup_table)
+    
+    # 5. Seuillage adaptatif robust
+    # Otsu avec pré-filtrage
+    blur_light = cv2.GaussianBlur(gamma_corrected, (3, 3), 0)
+    _, thresh_otsu = cv2.threshold(blur_light, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    
+    # Adaptatif avec paramètres plus conservateurs
+    thresh_adaptive = cv2.adaptiveThreshold(
+        gamma_corrected, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+        cv2.THRESH_BINARY, 21, 8
+    )
+    
+    # Versions inversées
+    inverted_otsu = cv2.bitwise_not(thresh_otsu)
+    inverted_adaptive = cv2.bitwise_not(thresh_adaptive)
+    
+    return {
+        'original_processed': gamma_corrected,
+        'otsu': thresh_otsu,
+        'otsu_inv': inverted_otsu,
+        'adaptive': thresh_adaptive,
+        'adaptive_inv': inverted_adaptive,
+        'corruption_detected': is_corrupted
+    }
+
+def extract_plate_components(text):
+    """Extraction robuste des composants même avec OCR partiel"""
+    
+    if not text:
+        return None, None, None
+    
+    # Nettoyer le texte
+    cleaned = re.sub(r'[^\u0600-\u06FF0-9\s]', ' ', text)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    
+    logging.info(f"🔍 Texte nettoyé pour extraction: '{cleaned}'")
+    
+    # 1. Pattern parfait: XXX تونس XXX
+    perfect_match = re.search(r'(\d+)\s*(?:تونس|ثونس|توس|تون|فتن|فونس|توتس)\s*(\d+)', cleaned)
+    if perfect_match:
+        return perfect_match.group(1), 'تونس', perfect_match.group(2)
+    
+    # 2. Recherche flexible des chiffres
+    digits = re.findall(r'\d+', cleaned)
+    
+    # 3. Recherche de fragments arabes
+    arabic_fragments = re.findall(r'[\u0600-\u06FF]+', cleaned)
+    
+    logging.info(f"🔢 Chiffres trouvés: {digits}")
+    logging.info(f"🔤 Fragments arabes: {arabic_fragments}")
+    
+    # 4. Reconstruction intelligente
+    if len(digits) >= 2:
+        # Prendre le premier et dernier groupe de chiffres
+        left_digits = digits[0]
+        right_digits = digits[-1]
         
-    # Nettoyage initial
-    text = text.strip().replace('\n', ' ').replace('\t', ' ')
-    text = re.sub(r'\s+', ' ', text)  # Supprimer espaces multiples
-    
-    print(f"[OCR] 🔍 Analyse du texte: '{text}'")
-    
-    # ✅ NETTOYAGE SPÉCIAL POUR ERREURS OCR COMMUNES
-    # Remplacer caractères mal lus
-    text = text.replace('(', '').replace(')', '').replace('|', '').replace('[', '').replace(']', '')
-    text = text.replace('.', ' ').replace(',', ' ').replace('_', '')
-    text = re.sub(r'[^\d\s\u0600-\u06FF]', ' ', text)  # Garder que chiffres, espaces et arabe
-    
-    print(f"[OCR] 🧹 Texte nettoyé: '{text}'")
-    
-    # 1. Chercher les chiffres (partie la plus fiable)
-    numbers = re.findall(r'\d+', text)
-    print(f"[OCR] 🔢 Chiffres trouvés: {numbers}")
-    
-    # ✅ CORRECTION SPÉCIALE POUR ERREURS OCR
-    cleaned_numbers = []
-    for num in numbers:
-        # Correction des erreurs communes
-        if num == '1799':  # 179.9 mal lu
-            cleaned_numbers.append('179')
-            print(f"[OCR] 🔧 Correction {num} → 179")
-        elif len(num) == 4 and num.startswith('179'):
-            cleaned_numbers.append('179')
-            print(f"[OCR] 🔧 Correction {num} → 179")
-        elif len(num) == 4 and num.endswith('911'):
-            cleaned_numbers.append('911')
-            print(f"[OCR] 🔧 Correction {num} → 911")
-        elif 2 <= len(num) <= 4:  # Garder nombres de 2-4 chiffres
-            cleaned_numbers.append(num)
-        elif len(num) > 4:
-            # Séparer les longs nombres (ex: "1799911" → "179", "911")
-            if len(num) == 7 and (num.startswith('179') or num.endswith('911')):
-                if num.startswith('179'):
-                    cleaned_numbers.extend(['179', num[4:]])  # 179 + les 3 derniers
-                else:
-                    cleaned_numbers.extend([num[:3], '911'])  # 3 premiers + 911
-                print(f"[OCR] ✂️ Séparation {num} → {cleaned_numbers[-2]} + {cleaned_numbers[-1]}")
-            elif len(num) == 6:
-                # Séparer en deux parties égales
-                mid = len(num) // 2
-                cleaned_numbers.extend([num[:mid], num[mid:]])
-                print(f"[OCR] ✂️ Séparation {num} → {num[:mid]} + {num[mid:]}")
-            else:
-                cleaned_numbers.append(num)
-    
-    numbers = cleaned_numbers
-    print(f"[OCR] 🔢 Chiffres corrigés: {numbers}")
-    
-    # 2. Chercher le mot "تونس" en arabe
-    arabic_tunisia = None
-    if 'تونس' in text:
-        arabic_tunisia = 'تونس'
-        print(f"[OCR] 🇹🇳 Mot 'تونس' détecté en arabe!")
-    elif 'تون' in text or 'ونس' in text:
-        arabic_tunisia = 'تونس'  # Reconstruction partielle
-        print(f"[OCR] 🇹🇳 Partie de 'تونس' détectée, reconstruction")
-    
-    # 3. Reconstruction de la plaque tunisienne
-    if len(numbers) >= 2:
-        first_part = numbers[0]
-        last_part = numbers[-1]
+        # Vérifier si on a des indices de "تونس"
+        has_arabic_hint = bool(arabic_fragments) or any(
+            hint in cleaned for hint in ['ت', 'و', 'ن', 'س', 'ف']
+        )
         
-        # Format tunisien classique : XXX تونس YYY
-        if len(first_part) >= 2 and len(last_part) >= 2:
-            if arabic_tunisia:
-                plate_candidate = f"{first_part} {arabic_tunisia} {last_part}"
-                print(f"[OCR] 🇹🇳 Plaque tunisienne complète: {plate_candidate}")
-                return plate_candidate
-            else:
-                # Version avec تونس ajouté automatiquement
-                plate_formatted = f"{first_part} تونس {last_part}"
-                print(f"[OCR] 🇹🇳 Plaque tunisienne reconstruite: {plate_formatted}")
-                return plate_formatted
+        if has_arabic_hint or len(digits) == 2:
+            return left_digits, 'تونس', right_digits
     
-    # 4. Si un seul bloc de chiffres
-    if len(numbers) == 1:
-        num = numbers[0]
-        if len(num) == 6:  # Ex: "179911"
-            first_part = num[:3]
-            last_part = num[3:]
-            plate_formatted = f"{first_part} تونس {last_part}"
-            print(f"[OCR] 🇹🇳 Reconstruction depuis bloc unique: {plate_formatted}")
-            return plate_formatted
-        elif len(num) >= 4:
-            print(f"[OCR] 🔢 Nombre unique conservé: {num}")
-            return num
+    # 5. Tentative désespérée: chercher juste des chiffres séparés
+    if len(digits) >= 2:
+        # Si on a au moins 2 groupes, supposer que c'est une plaque
+        return digits[0], 'تونس', digits[-1]
     
-    # 5. Fallback : retourner tous les chiffres trouvés
-    if numbers:
-        all_numbers = ''.join(numbers)
-        if len(all_numbers) >= 4:
-            print(f"[OCR] 📋 Fallback tous chiffres: {all_numbers}")
-            return all_numbers
+    return None, None, None
+
+def validate_reconstructed_plate(left, center, right):
+    """Validation permissive pour images corrompues"""
     
-    print(f"[OCR] ❌ Aucun candidat valide trouvé dans: '{text}'")
-    return None
+    if not left or not right:
+        return 0, ""
+    
+    # Nettoyer les composants
+    left_clean = re.sub(r'[^\d]', '', str(left))
+    right_clean = re.sub(r'[^\d]', '', str(right))
+    
+    # Critères minimaux
+    if len(left_clean) < 1 or len(right_clean) < 1:
+        return 0, ""
+    
+    if len(left_clean) > 5 or len(right_clean) > 5:
+        return 0, ""
+    
+    # Construction finale
+    final_plate = f"{left_clean} تونس {right_clean}"
+    
+    # Score permissif
+    score = 40  # Score de base plus bas
+    
+    # Bonus pour longueur
+    if 2 <= len(left_clean) <= 3 and 2 <= len(right_clean) <= 3:
+        score += 30
+    elif len(left_clean) >= 1 and len(right_clean) >= 1:
+        score += 20
+    
+    # Bonus pour diversité des chiffres
+    all_digits = left_clean + right_clean
+    if len(set(all_digits)) > 1:
+        score += 15
+    
+    # Bonus pour longueur totale raisonnable
+    if 4 <= len(all_digits) <= 7:
+        score += 10
+    
+    return score, final_plate
 
 @shared_task
 def run_ocr_task(image_bytes, camera_id):
-    """
-    Task OCR optimisée avec gestion d'erreurs améliorée
-    """
-    logger.info(f"Task OCR démarrée pour caméra {camera_id}")
+    """OCR robuste contre les corruptions H.264 AVEC NOTIFICATIONS WEBSOCKET"""
     
     try:
-        # Convertir l'image bytes en image OpenCV
+        # 1. Décodage avec gestion d'erreurs
         np_arr = np.frombuffer(image_bytes, np.uint8)
-        image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         
-        if image is None:
-            logger.error(f"Erreur décodage image (caméra {camera_id})")
-            return {"success": False, "error": "decode_error"}
+        if img is None:
+            logging.error(f"❌ Image non décodable Cam {camera_id} - Possible corruption H.264")
+            return {"success": False, "error": "Image corrompue (H.264?)"}
         
-        # Préprocessing simplifié
-        processed_image, gray_image = preprocess_image(image)
+        # 2. Préprocessing robuste avec détection de corruption
+        processed_data = robust_preprocessing(img)
         
-        # ✅ APPROCHE MULTIPLE : Essayer différentes versions de l'image
-        images_to_test = [
-            ("original_gray", cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)),
-            ("processed", processed_image),
-            ("enhanced", cv2.convertScaleAbs(gray_image, alpha=1.5, beta=20)),
+        if processed_data['corruption_detected']:
+            logging.warning(f"🚨 Corruption H.264 détectée et corrigée pour Cam {camera_id}")
+        
+        # 3. Configurations OCR adaptées aux images potentiellement corrompues
+        robust_configs = [
+            # Config très tolérante
+            {"config": "--psm 8 -c tessedit_do_invert=0", "lang": "ara+eng", "priority": 20},
+            {"config": "--psm 7 -c tessedit_do_invert=0", "lang": "ara+eng", "priority": 18},
+            {"config": "--psm 6 -c tessedit_do_invert=0", "lang": "ara+eng", "priority": 15},
+            
+            # Config avec inversion automatique
+            {"config": "--psm 8 -c tessedit_do_invert=1", "lang": "ara+eng", "priority": 16},
+            {"config": "--psm 7 -c tessedit_do_invert=1", "lang": "ara+eng", "priority": 14},
+            
+            # Config de secours
+            {"config": "--psm 8", "lang": "eng", "priority": 10},
+            {"config": "--psm 7", "lang": "eng", "priority": 8},
         ]
         
-        # Configuration OCR optimisée pour plaques tunisiennes
-        configs = [
-            "--psm 8 -c tessedit_char_whitelist=0123456789",  # CHIFFRES SEULEMENT
-            "--psm 7 -c tessedit_char_whitelist=0123456789",  # CHIFFRES SEULEMENT
-            "--psm 6 -l ara",  # ARABE SEULEMENT
-            "--psm 8 -l ara",  # ARABE SEULEMENT
-            "--psm 7 -l ara",  # ARABE SEULEMENT
-            "--psm 6 -l ara+eng",  # ARABE + ANGLAIS
-            "--psm 8",  # Standard
-        ]
-        
-        best_result = None
-        best_confidence = 0
+        best_result = ""
+        best_score = 0
         best_method = ""
+        debug_results = []
         
-        for img_name, test_image in images_to_test:
-            for config in configs:
+        # 4. Test sur toutes les versions d'image
+        image_versions = [
+            ('original', processed_data['original_processed']),
+            ('otsu', processed_data['otsu']),
+            ('otsu_inv', processed_data['otsu_inv']),
+            ('adaptive', processed_data['adaptive']),
+            ('adaptive_inv', processed_data['adaptive_inv'])
+        ]
+        
+        for img_name, img_version in image_versions:
+            for config_data in robust_configs:
                 try:
-                    # 🔧 OCR avec langue arabe
-                    if 'ara' in config:
-                        text = pytesseract.image_to_string(test_image, lang='ara', config=config).strip()
-                    else:
-                        text = pytesseract.image_to_string(test_image, lang='eng', config=config).strip()
+                    raw_text = pytesseract.image_to_string(
+                        img_version,
+                        lang=config_data["lang"],
+                        config=config_data["config"]
+                    ).strip()
                     
-                    if text and len(text) >= 2:  # Au moins 2 caractères
-                        # Calculer une confiance approximative basée sur la longueur et les caractères
-                        confidence = len(text) * 10  # Score simple
+                    if raw_text:
+                        debug_results.append(f"{img_name}_{config_data['lang']}: '{raw_text}'")
                         
-                        if confidence > best_confidence:
-                            best_confidence = confidence
-                            best_result = text
-                            best_method = f"{img_name}+{config}"
+                        # Extraction des composants
+                        left, center, right = extract_plate_components(raw_text)
+                        
+                        if left and right:
+                            score, validated = validate_reconstructed_plate(left, center, right)
+                            total_score = score + config_data["priority"]
                             
-                        print(f"[OCR] 🔍 Test {img_name}+{config}: '{text}' (score: {confidence})")
-                        
+                            if total_score > best_score:
+                                best_score = total_score
+                                best_result = validated
+                                best_method = f"{img_name}_{config_data['lang']}"
+                
                 except Exception as e:
+                    logging.warning(f"Erreur OCR {img_name}/{config_data['lang']}: {e}")
                     continue
         
-        # ✅ FALLBACK : OCR très permissif si rien trouvé
-        if not best_result:
-            try:
-                # Dernière tentative avec arabe pur
-                arabic_text = pytesseract.image_to_string(gray_image, lang='ara', config='--psm 6').strip()
-                if arabic_text:
-                    best_result = arabic_text
-                    best_confidence = 10
-                    best_method = "fallback_arabic"
-                    print(f"[OCR] 🆘 Fallback arabe détecté: '{arabic_text}'")
-                else:
-                    # Fallback anglais
-                    simple_text = pytesseract.image_to_string(gray_image, lang='eng', config='--psm 8').strip()
-                    if simple_text:
-                        best_result = simple_text
-                        best_confidence = 5
-                        best_method = "fallback_eng"
-                        print(f"[OCR] 🆘 Fallback anglais détecté: '{simple_text}'")
-            except:
-                pass
+        # 5. Debug complet
+        logging.info(f"🔍 DEBUG Cam {camera_id} - H.264 corruption: {processed_data['corruption_detected']}")
+        for result in debug_results[:8]:  # Limiter pour éviter spam
+            logging.info(f"    {result}")
         
-        if not best_result:
-            print(f"[OCR] ❌ Aucun texte détecté même avec seuils bas (caméra {camera_id})")
-            return {"success": False, "error": "no_text_detected"}
+        # 6. Résultat final avec seuil plus bas pour images corrompues
+        min_score = 40 if processed_data['corruption_detected'] else 50
         
-        # 💾 Sauvegarde pour debug avec nom plus informatif
-        timestamp = int(time.time())
-        filename = os.path.join(debug_dir, f"cam{camera_id}_{timestamp}_{best_method.replace('+', '_')}.jpg")
-        cv2.imwrite(filename, processed_image)
-        
-        # ✅ EXTRACTION AMÉLIORÉE - Plus permissive
-        license_plate = extract_license_plate_text(best_result)
-        
-        # 📝 AFFICHAGE DÉTAILLÉ DU RÉSULTAT
-        print(f"[OCR] 📋 Méthode utilisée: {best_method}")
-        print(f"[OCR] 📝 Texte brut: '{best_result}'")
-        
-        if license_plate:
-            # ✅ AFFICHAGE DU MATRICULE DÉTECTÉ
-            print(f"[OCR] 🎯 ✅ MATRICULE DÉTECTÉ (Cam {camera_id}): '{license_plate}' (méthode: {best_method})")
+        if best_result and best_score >= min_score:
+            logging.info(f"✅ OCR Cam {camera_id}: '{best_result}' (score: {best_score}, method: {best_method})")
             
-            # Stocker dans Redis pour affichage en temps réel (optionnel)
-            try:
-                import redis
-                r = redis.StrictRedis(host='localhost', port=6379, db=0)
-                r.set(f"detected_plate_{camera_id}", license_plate, ex=30)  # Expire après 30s
-                r.set(f"detected_plate_time_{camera_id}", time.time(), ex=30)
-            except:
-                pass
+            # Sauvegarder dans Redis
+            r.set(f"detected_plate_{camera_id}", best_result, ex=30)
+            
+            # 🚨 NOUVEAU: Vérification et notification WebSocket
+            detection, is_authorized = check_and_save_detection(
+                best_result, camera_id, best_score
+            )
             
             return {
-                "success": True, 
-                "license_plate": license_plate,
-                "confidence": best_confidence,
-                "camera_id": camera_id,
-                "timestamp": timestamp,
-                "method": best_method
+                "success": True,
+                "license_plate": best_result,
+                "confidence_score": best_score,
+                "h264_corruption": processed_data['corruption_detected'],
+                "detection_method": best_method,
+                "is_authorized": is_authorized,  # Nouveau champ
+                "detection_id": detection.id if detection else None  # Nouveau champ
             }
-        else:
-            # ✅ RETOUR DU TEXTE BRUT même si format non reconnu
-            print(f"[OCR] ⚠️ Texte détecté mais format non reconnu: '{best_result}'")
-            print(f"[OCR] 💡 Essayez d'ajuster les patterns regex si nécessaire")
-            
-            return {
-                "success": False, 
-                "error": "invalid_format",
-                "raw_text": best_result,
-                "camera_id": camera_id,
-                "method": best_method
-            }
-            
+        
+        logging.error(f"❌ Échec OCR Cam {camera_id} - Score: {best_score}, H.264: {processed_data['corruption_detected']}")
+        return {"success": False, "error": f"OCR failed (score: {best_score}, H.264: {processed_data['corruption_detected']})"}
+        
     except Exception as e:
-        logger.error(f"Exception OCR Cam {camera_id}: {e}")
-        return {"success": False, "error": str(e), "camera_id": camera_id}
+        logging.error(f"❌ Erreur critique OCR Cam {camera_id}: {e}")
+        return {"success": False, "error": str(e)}

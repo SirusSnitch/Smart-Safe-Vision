@@ -1,0 +1,39 @@
+<table id="notification-table" border="1">
+  <thead>
+    <tr>
+      <th>Matricule</th>
+      <th>Caméra</th>
+      <th>Lieu</th>
+      <th>Date</th>
+      <th>Confiance</th>
+      <th>Message</th>
+    </tr>
+  </thead>
+  <tbody id="notification-body"></tbody>
+</table>
+
+<script>
+  const socket = new WebSocket(
+    "ws://" + window.location.host + "/ws/notifications/"
+  );
+
+  socket.onmessage = function (event) {
+    console.log("Message reçu :", event.data); // Devrait afficher l'objet brut
+
+    const data = JSON.parse(event.data); // ✅ CORRIGÉ ICI
+    const tableBody = document.getElementById("notification-body");
+
+    const row = document.createElement("tr");
+
+    row.innerHTML = `
+      <td>${data.matricule ?? "—"}</td>
+      <td>${data.camera}</td>
+      <td>${data.location}</td>
+      <td>${new Date(data.timestamp).toLocaleString()}</td>
+      <td>${data.confidence?.toFixed(2) ?? "N/A"}</td>
+      <td>${data.message}</td>
+    `;
+
+    tableBody.prepend(row);
+  };
+</script>

@@ -36,16 +36,12 @@ class MatriculeAutorise(models.Model):  # ✅ Corrigé : nom de classe sans acce
     def __str__(self):
         return self.numero
 
-
 class DetectionMatricule(models.Model):
-    numero = models.CharField(max_length=20)
-    date_detection = models.DateField(default=timezone.now)
-    heure_detection = models.TimeField(default=timezone.now)
-    camera = models.ForeignKey(
-        Camera, on_delete=models.CASCADE,
-        related_name='detections'
-    )
+    numero = models.CharField(max_length=255)
+    image = models.ImageField(upload_to='matricules/', null=True, blank=True)
+    timestamp = models.DateTimeField(default=timezone.now)
     est_autorise = models.BooleanField(default=False)
+    camera = models.ForeignKey('Camera', on_delete=models.CASCADE)
 
     def __str__(self):
-        return f"{self.numero} à {self.date_detection} {self.heure_detection}"
+        return f"{self.numero} - {self.camera.name} - {self.timestamp}"

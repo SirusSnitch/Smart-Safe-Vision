@@ -1,6 +1,5 @@
-
 # ============================================================================
-# YOLO_DETECT_TASK.PY - Version optimisée
+# YOLO_DETECT_TASK.PY - Version optimisée avec intégration WebSocket et OCR
 # ============================================================================
 
 import base64
@@ -14,7 +13,13 @@ import time
 import gc
 import os
 import logging
-from typing import Optional, Tuple
+from typing import Optional
+# NOUVEAUX IMPORTS POUR WEBSOCKET
+from django.apps import apps
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from django.utils import timezone
+from django.core.files.base import ContentFile
 from gismap.tasks.ocr_task import run_ocr_task
 
 # Configuration du logging
@@ -22,30 +27,24 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class YOLODetector:
-    """Classe pour gérer le modèle YOLO de manière optimisée"""
-    
     def __init__(self, model_path: str):
         self.model_path = model_path
         self.model = None
         self.load_model()
-    
+
     def load_model(self):
-        """Chargement sécurisé du modèle"""
         if not torch.cuda.is_available():
             raise RuntimeError("🚫 CUDA n'est pas disponible.")
-        
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"Modèle non trouvé: {self.model_path}")
-        
         try:
             self.model = YOLO(self.model_path).to("cuda")
             logger.info(f"✅ Modèle YOLO chargé: {self.model_path}")
         except Exception as e:
             logger.error(f"❌ Erreur chargement modèle: {e}")
             raise
-    
+
     def detect_plates(self, frame: np.ndarray, conf_threshold: float = 0.25) -> list:
-        """Détection des plaques avec gestion d'erreurs"""
         try:
             results = self.model.predict(
                 source=frame,
@@ -53,9 +52,8 @@ class YOLODetector:
                 conf=conf_threshold,
                 device='cuda',
                 imgsz=(640, 384),
-                verbose=False  # Réduire les logs YOLO
+                verbose=False
             )
-            
             detections = []
             for result in results:
                 if result.boxes is not None:
@@ -66,227 +64,157 @@ class YOLODetector:
                             'bbox': (x1, y1, x2, y2),
                             'confidence': confidence
                         })
-            
             return detections, results
-            
         except Exception as e:
             logger.error(f"Erreur détection YOLO: {e}")
             return [], None
 
-# Initialisation du détecteur
 current_dir = os.path.dirname(__file__)
 model_path = os.path.abspath(os.path.join(current_dir, "..", "yolo", "best.pt"))
 detector = YOLODetector(model_path)
 
-# Connexion Redis avec gestion d'erreurs
 try:
     r = redis.StrictRedis(host='localhost', port=6379, db=0, socket_timeout=5)
-    r.ping()  # Test de connexion
+    r.ping()
     logger.info("✅ Connexion Redis établie")
 except redis.ConnectionError:
     logger.error("❌ Impossible de se connecter à Redis")
     raise
 
 def decode_frame_from_redis(encoded_frame: bytes) -> Optional[np.ndarray]:
-    """Décodage sécurisé des frames depuis Redis"""
     try:
-        # Corriger le padding base64
         img_data = base64.b64decode(encoded_frame + b'=' * (-len(encoded_frame) % 4))
         np_arr = np.frombuffer(img_data, np.uint8)
         frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        
-        if frame is None:
-            logger.warning("Image vide après décodage")
-            return None
-            
         return frame
-        
     except Exception as e:
         logger.error(f"Erreur décodage frame: {e}")
         return None
 
+def send_unauthorized_notification(matricule_data):
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            notification_data = {
+                'type': 'send_notification',
+                'data': {
+                    'alert_type': 'unauthorized_plate',
+                    'matricule': matricule_data['numero'],
+                    'camera': matricule_data['camera_name'],
+                    'location': matricule_data.get('location', 'Inconnue'),
+                    'timestamp': timezone.now().isoformat(),
+                    'confidence': matricule_data.get('confidence_score', 0),
+                    'message': f"🚨 Matricule non autorisée: {matricule_data['numero']}"
+                }
+            }
+            async_to_sync(channel_layer.group_send)('notifications', notification_data)
+            logger.info(f"📢 Notification envoyée: {matricule_data['numero']}")
+    except Exception as e:
+        logger.error(f"❌ Erreur notification WebSocket: {e}")
+
+def check_and_save_detection(license_plate, camera_id, confidence_score, image_bytes=None):
+    try:
+        DetectionMatricule = apps.get_model('gismap', 'DetectionMatricule')
+        MatriculeAutorise = apps.get_model('gismap', 'MatriculeAutorise')
+        Camera = apps.get_model('gismap', 'Camera')
+
+        camera = Camera.objects.get(id=camera_id)
+        is_authorized = False
+        if camera.department:
+            is_authorized = MatriculeAutorise.objects.filter(numero=license_plate, lieu=camera.department).exists()
+
+        detection = DetectionMatricule.objects.create(
+            numero=license_plate,
+            camera=camera,
+            est_autorise=is_authorized
+        )
+
+        if image_bytes:
+            filename = f"{timezone.now().strftime('%Y%m%d_%H%M%S')}_{license_plate}.jpg"
+            detection.image.save(filename, ContentFile(image_bytes), save=True)
+
+        if not is_authorized:
+            matricule_data = {
+                'numero': license_plate,
+                'camera_name': camera.name,
+                'location': camera.department.name if camera.department else 'Inconnue',
+                'confidence_score': confidence_score,
+                'detection_id': detection.id
+            }
+            send_unauthorized_notification(matricule_data)
+            logger.warning(f"🚨 ALERTE: Matricule non autorisée {license_plate} (Cam: {camera.name})")
+        else:
+            logger.info(f"✅ Matricule autorisée: {license_plate} (Cam: {camera.name})")
+
+        return detection, is_authorized
+
+    except Exception as e:
+        logger.error(f"❌ Erreur vérification matricule: {e}")
+        return None, False
+
 def process_detections(frame: np.ndarray, detections: list, camera_id: int) -> np.ndarray:
-    """Traitement des détections et envoi vers OCR"""
+
     annotated_frame = frame.copy()
-    
     for detection in detections:
         x1, y1, x2, y2 = detection['bbox']
         confidence = detection['confidence']
-        
-        # Validation de la taille de la détection
         width, height = x2 - x1, y2 - y1
-        if width < 50 or height < 20:  # Trop petite
+        if width < 50 or height < 20:
             continue
-            
-        # Extraction de la région d'intérêt avec marge
         margin = 5
         x1_crop = max(0, x1 - margin)
         y1_crop = max(0, y1 - margin)
         x2_crop = min(frame.shape[1], x2 + margin)
         y2_crop = min(frame.shape[0], y2 + margin)
-        
         cropped = frame[y1_crop:y2_crop, x1_crop:x2_crop]
-        
         if cropped.size > 0:
-            # Encoder la plaque en bytes pour la task OCR
             _, buffer = cv2.imencode('.jpg', cropped, [cv2.IMWRITE_JPEG_QUALITY, 95])
             image_bytes = buffer.tobytes()
-            
-            logger.info(f"📤 Envoi détection à OCR (Cam {camera_id}, conf: {confidence:.2f})")
-            
-            # Appel asynchrone à la task OCR
             run_ocr_task.delay(image_bytes, camera_id)
-        
-        # Annotation de la frame
         cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
         cv2.putText(annotated_frame, f'{confidence:.2f}', (x1, y1-10), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-    
     return annotated_frame
 
 @shared_task
 def detect_from_redis(camera_id: int, max_iterations: int = 1000):
-    """
-    Task de détection optimisée avec gestion d'erreurs et limitations
-    """
     logger.info(f"🚀 Démarrage détection YOLO pour caméra {camera_id}")
-    
     iterations = 0
     consecutive_errors = 0
     max_consecutive_errors = 10
-    
     try:
         while iterations < max_iterations:
-            try:
-                # Récupération de la frame depuis Redis
-                encoded_frame = r.get(f"camera_frame_{camera_id}")
-                
-                if not encoded_frame:
-                    logger.debug(f"⏳ En attente de frame pour caméra {camera_id}")
-                    time.sleep(0.5)  # Réduction du délai
-                    continue
-                
-                # Décodage de la frame
-                frame = decode_frame_from_redis(encoded_frame)
-                if frame is None:
-                    consecutive_errors += 1
-                    if consecutive_errors > max_consecutive_errors:
-                        logger.error(f"Trop d'erreurs consécutives, arrêt de la caméra {camera_id}")
-                        break
-                    continue
-                
-                # Reset du compteur d'erreurs
-                consecutive_errors = 0
-                
-                # Redimensionnement optimal
-                frame = cv2.resize(frame, (640, 384))
-                
-                # Détection des plaques
-                detections, yolo_results = detector.detect_plates(frame)
-                
-                if detections:
-                    logger.info(f"🎯 {len(detections)} plaque(s) détectée(s) (Cam {camera_id})")
-                    
-                    # Traitement des détections
-                    annotated_frame = process_detections(frame, detections, camera_id)
-                else:
-                    annotated_frame = frame
-                
-                # Affichage (optionnel - peut être désactivé en production)
-                if os.getenv('ENABLE_DISPLAY', 'true').lower() == 'true':
-                    cv2.imshow(f"🎯 Caméra {camera_id}", annotated_frame)
-                    
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
-                        logger.info(f"🛑 Arrêt demandé par utilisateur")
-                        break
-                
-                # Nettoyage mémoire
-                if yolo_results:
-                    del yolo_results
-                torch.cuda.empty_cache()
-                gc.collect()
-                
-                # Délai adaptatif
-                time.sleep(0.1)
-                iterations += 1
-                
-            except redis.ConnectionError:
-                logger.error(f"❌ Perte de connexion Redis")
-                time.sleep(5)  # Attendre avant de reconnecter
+            encoded_frame = r.get(f"camera_frame_{camera_id}")
+            if not encoded_frame:
+                time.sleep(0.5)
+                continue
+            frame = decode_frame_from_redis(encoded_frame)
+            if frame is None:
                 consecutive_errors += 1
-                
-            except Exception as e:
-                logger.error(f"❌ Erreur dans la boucle de détection: {e}")
-                consecutive_errors += 1
-                time.sleep(1)
-                
                 if consecutive_errors > max_consecutive_errors:
-                    logger.error(f"Arrêt après {max_consecutive_errors} erreurs consécutives")
                     break
-    
-    except KeyboardInterrupt:
-        logger.info("🛑 Interruption clavier détectée")
-    
+                continue
+            consecutive_errors = 0
+            frame = cv2.resize(frame, (640, 384))
+            detections, yolo_results = detector.detect_plates(frame)
+            if detections:
+                logger.info(f"🎯 {len(detections)} plaque(s) détectée(s) (Cam {camera_id})")
+                annotated_frame = process_detections(frame, detections, camera_id)
+            else:
+                annotated_frame = frame
+            if os.getenv('ENABLE_DISPLAY', 'true').lower() == 'true':
+                cv2.imshow(f"🎯 Caméra {camera_id}", annotated_frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            if yolo_results:
+                del yolo_results
+            torch.cuda.empty_cache()
+            gc.collect()
+            time.sleep(0.1)
+            iterations += 1
     except Exception as e:
-        logger.error(f"❌ Erreur fatale: {e}")
-    
+        logger.error(f"❌ Erreur: {e}")
     finally:
         cv2.destroyAllWindows()
-        logger.info(f"🧹 Nettoyage terminé pour caméra {camera_id}")
-        
-        return {
-            "camera_id": camera_id,
-            "iterations_completed": iterations,
-            "status": "completed"
-        }
-
-# ============================================================================
-# FONCTIONS UTILITAIRES SUPPLÉMENTAIRES
-# ============================================================================
-
-@shared_task
-def cleanup_debug_files(max_age_hours: int = 24):
-    """Task de nettoyage des fichiers debug anciens"""
-    try:
-        current_time = time.time()
-        deleted_count = 0
-        
-        for filename in os.listdir(debug_dir):
-            file_path = os.path.join(debug_dir, filename)
-            file_age = current_time - os.path.getctime(file_path)
-            
-            if file_age > (max_age_hours * 3600):  # Convertir heures en secondes
-                os.remove(file_path)
-                deleted_count += 1
-        
-        logger.info(f"🧹 Nettoyage: {deleted_count} fichiers supprimés")
-        return {"deleted_count": deleted_count}
-        
-    except Exception as e:
-        logger.error(f"Erreur nettoyage: {e}")
-        return {"error": str(e)}
-
-@shared_task
-def health_check_cameras():
-    """Vérification de l'état des caméras dans Redis"""
-    try:
-        camera_status = {}
-        
-        # Vérifier les clés de caméras actives
-        camera_keys = r.keys("camera_frame_*")
-        
-        for key in camera_keys:
-            camera_id = key.decode().split('_')[-1]
-            last_update = r.ttl(key)
-            
-            camera_status[camera_id] = {
-                "active": last_update > 0,
-                "ttl": last_update
-            }
-        
-        logger.info(f"📊 État des caméras: {camera_status}")
-        return {"camera_status": camera_status}
-        
-    except Exception as e:
-        logger.error(f"Erreur health check: {e}")
-        return {"error": str(e)}
+        logger.info(f"🧹 Fin détection caméra {camera_id}")
+        return {"camera_id": camera_id, "iterations_completed": iterations, "status": "completed"}

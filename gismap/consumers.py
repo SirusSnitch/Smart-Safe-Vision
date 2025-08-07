@@ -1,14 +1,14 @@
-from channels.generic.websocket import AsyncWebsocketConsumer
 import json
+from channels.generic.websocket import AsyncWebsocketConsumer
 
-class TestConsumer(AsyncWebsocketConsumer):
+class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        await self.channel_layer.group_add("notifications", self.channel_name)
         await self.accept()
-        await self.send(text_data=json.dumps({'message': 'Connexion WebSocket réussie !'}))
 
     async def disconnect(self, close_code):
-        pass
+        await self.channel_layer.group_discard("notifications", self.channel_name)
 
-    async def receive(self, text_data):
-        data = json.loads(text_data)
-        await self.send(text_data=json.dumps({'message': f"Reçu: {data['message']}"}))
+    async def send_notification(self, event):
+        message = event['data']
+        await self.send(text_data=json.dumps(message))
