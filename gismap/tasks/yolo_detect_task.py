@@ -1,5 +1,5 @@
 # ============================================================================
-# YOLO_DETECT_TASK.PY - Version optimisée avec intégration WebSocket et OCR
+# YOLO_DETECT_TASK.PY - Multi-model detection, OCR only on best.pt detections
 # ============================================================================
 
 import base64
@@ -12,9 +12,9 @@ import redis
 import time
 import gc
 import os
+import math
 import logging
 from typing import Optional
-# NOUVEAUX IMPORTS POUR WEBSOCKET
 from django.apps import apps
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -22,10 +22,12 @@ from django.utils import timezone
 from django.core.files.base import ContentFile
 from gismap.tasks.ocr_task import run_ocr_task
 
-# Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+current_dir = os.path.dirname(__file__)
+
+# --- YOLODetector class ---
 class YOLODetector:
     def __init__(self, model_path: str):
         self.model_path = model_path
@@ -43,8 +45,7 @@ class YOLODetector:
             logger.error(f"❌ Erreur chargement modèle: {e}")
             raise
 
-
-    def detect_plates(self, frame: np.ndarray, conf_threshold: float = 0.25) -> list:
+    def detect_plates(self, frame: np.ndarray, conf_threshold: float = 0.25) -> tuple:
         try:
             results = self.model.predict(
                 source=frame,
@@ -69,10 +70,16 @@ class YOLODetector:
             logger.error(f"Erreur détection YOLO: {e}")
             return [], None
 
-current_dir = os.path.dirname(__file__)
-model_path = os.path.abspath(os.path.join(current_dir, "..", "yolo", "best.pt"))
-detector = YOLODetector(model_path)
+# --- Load models ---
+model_path_best = os.path.abspath(os.path.join(current_dir, "..", "yolo", "best.pt"))
+model_path_box = os.path.abspath(os.path.join(current_dir, "..", "yolo", "box.pt"))
+model_path_pose = os.path.abspath(os.path.join(current_dir, "..", "yolo", "yolov8s-pose.pt"))
 
+detector_best = YOLODetector(model_path_best)
+detector_box = YOLODetector(model_path_box)
+pose_detector = YOLO(model_path_pose)  # pose model loaded directly, no wrapper
+
+# --- Redis connection ---
 try:
     r = redis.StrictRedis(host='localhost', port=6379, db=0, socket_timeout=5)
     r.ping()
@@ -81,6 +88,7 @@ except redis.ConnectionError:
     logger.error("❌ Impossible de se connecter à Redis")
     raise
 
+# --- Helper: decode frame from Redis ---
 def decode_frame_from_redis(encoded_frame: bytes) -> Optional[np.ndarray]:
     try:
         img_data = base64.b64decode(encoded_frame + b'=' * (-len(encoded_frame) % 4))
@@ -91,6 +99,7 @@ def decode_frame_from_redis(encoded_frame: bytes) -> Optional[np.ndarray]:
         logger.error(f"Erreur décodage frame: {e}")
         return None
 
+# --- WebSocket notification ---
 def send_unauthorized_notification(matricule_data):
     try:
         channel_layer = get_channel_layer()
@@ -112,6 +121,7 @@ def send_unauthorized_notification(matricule_data):
     except Exception as e:
         logger.error(f"❌ Erreur notification WebSocket: {e}")
 
+# --- DB save/check ---
 def check_and_save_detection(license_plate, camera_id, confidence_score, image_bytes=None):
     try:
         DetectionMatricule = apps.get_model('gismap', 'DetectionMatricule')
@@ -152,8 +162,8 @@ def check_and_save_detection(license_plate, camera_id, confidence_score, image_b
         logger.error(f"❌ Erreur vérification matricule: {e}")
         return None, False
 
-def process_detections(frame: np.ndarray, detections: list, camera_id: int) -> np.ndarray:
-
+# --- Process detections ---
+def process_detections(frame: np.ndarray, detections: list, camera_id: int, run_ocr: bool) -> np.ndarray:
     annotated_frame = frame.copy()
     for detection in detections:
         x1, y1, x2, y2 = detection['bbox']
@@ -167,15 +177,83 @@ def process_detections(frame: np.ndarray, detections: list, camera_id: int) -> n
         x2_crop = min(frame.shape[1], x2 + margin)
         y2_crop = min(frame.shape[0], y2 + margin)
         cropped = frame[y1_crop:y2_crop, x1_crop:x2_crop]
-        if cropped.size > 0:
+        if cropped.size > 0 and run_ocr:
             _, buffer = cv2.imencode('.jpg', cropped, [cv2.IMWRITE_JPEG_QUALITY, 95])
             image_bytes = buffer.tobytes()
             run_ocr_task.delay(image_bytes, camera_id)
         cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(annotated_frame, f'{confidence:.2f}', (x1, y1-10), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        cv2.putText(annotated_frame, f'{confidence:.2f}', (x1, y1 - 10), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
     return annotated_frame
 
+# --- Pose helpers ---
+def get_angle(a, b, c):
+    ba = a - b
+    bc = c - b
+    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+    angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
+    return np.degrees(angle)
+
+def get_torso_angle(p1, p2):
+    dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+    return abs(math.degrees(math.atan2(dy, dx)))
+
+def is_fallen(keypoints, image_height):
+    k = keypoints[:, :2]
+    l_sh, r_sh = k[5], k[6]
+    l_hip, r_hip = k[11], k[12]
+    mid_sh = (l_sh + r_sh) / 2
+    mid_hip = (l_hip + r_hip) / 2
+    torso_angle = get_torso_angle(mid_sh, mid_hip)
+    w, h = max(k[:, 0]) - min(k[:, 0]), max(k[:, 1]) - min(k[:, 1])
+    horizontal = w > h
+    center_y = np.mean(k[:, 1])
+    low_center = center_y > image_height * 0.6
+    return (torso_angle < 30 or torso_angle > 150) and horizontal and low_center
+
+def is_fight_aggression(keypoints):
+    k = keypoints[:, :2]
+
+    nose = k[0]
+    l_wrist, r_wrist = k[9], k[10]
+    l_elbow, r_elbow = k[7], k[8]
+    l_shoulder, r_shoulder = k[5], k[6]
+    l_hip, r_hip = k[11], k[12]
+
+    def dist(a, b): return np.linalg.norm(a - b)
+
+    lw_head_close = dist(l_wrist, nose) < 80
+    rw_head_close = dist(r_wrist, nose) < 80
+
+    lw_shoulder_close = dist(l_wrist, l_shoulder) < 100
+    rw_shoulder_close = dist(r_wrist, r_shoulder) < 100
+
+    l_arm_angle = get_angle(l_shoulder, l_elbow, l_wrist)
+    r_arm_angle = get_angle(r_shoulder, r_elbow, r_wrist)
+    elbows_bent = (l_arm_angle < 120 and r_arm_angle < 120)
+
+    mid_shoulder = (l_shoulder + r_shoulder) / 2
+    mid_hip = (l_hip + r_hip) / 2
+    torso_angle = get_torso_angle(mid_shoulder, mid_hip)
+    leaning_forward = 70 < torso_angle < 110
+
+    close_arms = (lw_head_close and lw_shoulder_close) or (rw_head_close and rw_shoulder_close)
+    return close_arms and elbows_bent and leaning_forward
+
+def classify_pose(result, image_height):
+    persons = []
+    if result.keypoints is None:
+        return persons
+    for kp in result.keypoints.data.cpu().numpy():
+        label = "Normal"
+        if is_fallen(kp, image_height):
+            label = "Fallen"
+        elif is_fight_aggression(kp):
+            label = "Aggression"
+        persons.append((label, kp))
+    return persons
+
+# --- Main detection task ---
 @shared_task
 def detect_from_redis(camera_id: int, max_iterations: int = 1000):
     logger.info(f"🚀 Démarrage détection YOLO pour caméra {camera_id}")
@@ -195,19 +273,51 @@ def detect_from_redis(camera_id: int, max_iterations: int = 1000):
                     break
                 continue
             consecutive_errors = 0
+
             frame = cv2.resize(frame, (640, 384))
-            detections, yolo_results = detector.detect_plates(frame)
-            if detections:
-                logger.info(f"🎯 {len(detections)} plaque(s) détectée(s) (Cam {camera_id})")
-                annotated_frame = process_detections(frame, detections, camera_id)
+
+            # --- Detect with best.pt and box.pt ---
+            detections_best, _ = detector_best.detect_plates(frame)
+            detections_box, _ = detector_box.detect_plates(frame)
+
+            annotated_frame = frame.copy()
+
+            if detections_best:
+                annotated_frame = process_detections(frame, detections_best, camera_id, run_ocr=True)
+                logger.info(f"🎯 {len(detections_best)} plaque(s) détectée(s) par best.pt (Cam {camera_id})")
             else:
-                annotated_frame = frame
+                logger.info(f"🎯 Aucune plaque détectée par best.pt (Cam {camera_id})")
+
+            if detections_box:
+                annotated_frame = process_detections(annotated_frame, detections_box, camera_id, run_ocr=False)
+                logger.info(f"📦 {len(detections_box)} objet(s) détecté(s) par box.pt (Cam {camera_id})")
+            else:
+                logger.info(f"📦 Aucun objet détecté par box.pt (Cam {camera_id})")
+
+            # --- Pose detection & annotation ---
+            pose_results = pose_detector.predict(
+                source=frame,
+                conf=0.5,
+                device='cuda' if torch.cuda.is_available() else 'cpu',
+                verbose=False
+            )
+
+            persons = classify_pose(pose_results[0], frame.shape[0])
+
+            for label, kp in persons:
+                x0, y0 = kp[0][:2]
+                if x0 == 0 and y0 == 0:
+                    x0 = int((kp[5][0] + kp[6][0]) / 2)
+                    y0 = int((kp[5][1] + kp[6][1]) / 2)
+                color = (0, 0, 255) if label == "Fallen" else (0, 165, 255) if label == "Aggression" else (0, 255, 0)
+                cv2.putText(annotated_frame, label, (int(x0), int(y0) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                cv2.circle(annotated_frame, (int(x0), int(y0)), 5, (255, 0, 0), -1)
+
             if os.getenv('ENABLE_DISPLAY', 'true').lower() == 'true':
                 cv2.imshow(f"🎯 Caméra {camera_id}", annotated_frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
-            if yolo_results:
-                del yolo_results
+
             torch.cuda.empty_cache()
             gc.collect()
             time.sleep(0.1)
