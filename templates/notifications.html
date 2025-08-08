@@ -7,6 +7,7 @@
       <th>Date</th>
       <th>Confiance</th>
       <th>Message</th>
+      <th>Image</th>
     </tr>
   </thead>
   <tbody id="notification-body"></tbody>
@@ -18,12 +19,18 @@
   );
 
   socket.onmessage = function (event) {
-    console.log("Message reçu :", event.data); // Devrait afficher l'objet brut
+    console.log("Message reçu :", event.data);
 
-    const data = JSON.parse(event.data); // ✅ CORRIGÉ ICI
+    const data = JSON.parse(event.data);
     const tableBody = document.getElementById("notification-body");
 
     const row = document.createElement("tr");
+
+    // Construction dynamique de l'image si présente
+    let imageHtml = "—";
+    if (data.image_base64) {
+      imageHtml = `<img src="data:image/jpeg;base64,${data.image_base64}" width="150" />`;
+    }
 
     row.innerHTML = `
       <td>${data.matricule ?? "—"}</td>
@@ -32,6 +39,7 @@
       <td>${new Date(data.timestamp).toLocaleString()}</td>
       <td>${data.confidence?.toFixed(2) ?? "N/A"}</td>
       <td>${data.message}</td>
+      <td>${imageHtml}</td> <!-- ✅ affichage image -->
     `;
 
     tableBody.prepend(row);

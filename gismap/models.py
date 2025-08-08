@@ -12,7 +12,7 @@ class Lieu(models.Model):
 
 
 class Camera(models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=1000)
     rtsp_url = models.URLField()
     hls_url = models.URLField()
     location = models.PointField()
@@ -38,7 +38,7 @@ class MatriculeAutorise(models.Model):  # ✅ Corrigé : nom de classe sans acce
 
 class DetectionMatricule(models.Model):
     numero = models.CharField(max_length=255)
-    image = models.ImageField(upload_to='matricules/', null=True, blank=True)
+    image = models.BinaryField(null=True, blank=True)  # Stocker l’image directement
     timestamp = models.DateTimeField(default=timezone.now)
     est_autorise = models.BooleanField(default=False)
     camera = models.ForeignKey('Camera', on_delete=models.CASCADE)

@@ -64,6 +64,7 @@ def send_unauthorized_notification(matricule_data):
         logging.error(f"❌ Traceback: {traceback.format_exc()}")
         return False
 # NOUVELLE FONCTION: Vérification et sauvegarde
+  # NOUVELLE FONCTION: Vérification et sauvegarde
 def check_and_save_detection(license_plate, camera_id, confidence_score, image_bytes=None):
     """Vérifie autorisation et envoie notification si nécessaire"""
     try:
@@ -71,53 +72,67 @@ def check_and_save_detection(license_plate, camera_id, confidence_score, image_b
         DetectionMatricule = apps.get_model('gismap', 'DetectionMatricule')
         MatriculeAutorise = apps.get_model('gismap', 'MatriculeAutorise')
         Camera = apps.get_model('gismap', 'Camera')
-        
+
         # Récupérer la caméra
         camera = Camera.objects.get(id=camera_id)
-        
-        # Vérifier autorisation dans le lieu de la caméra
+
+        # Vérifier si autorisé dans ce lieu
         is_authorized = False
         if camera.department:
             is_authorized = MatriculeAutorise.objects.filter(
                 numero=license_plate,
                 lieu=camera.department
             ).exists()
-        
-        # Sauvegarder la détection
+
+        # Créer l'instance de détection (image sera ajoutée ensuite)
         detection = DetectionMatricule.objects.create(
             numero=license_plate,
             camera=camera,
             est_autorise=is_authorized
         )
-        
-        # CORRECTION: Sauvegarde image AVANT les notifications (était mal indenté)
+
+        # Stocker directement l’image dans la base de données
         if image_bytes:
-            filename = f"{timezone.now().strftime('%Y%m%d_%H%M%S')}_{license_plate}.jpg"
-            detection.image.save(filename, ContentFile(image_bytes), save=True)
-        
-        # Notification pour matricule non autorisée
+           detection.image = image_bytes
+           detection.save()
+        # 🚨 Si matricule non autorisée → envoyer la notification WebSocket
         if not is_authorized:
+            # Encoder l'image en base64 pour l’envoyer
+            image_base64 = None
+            if image_bytes:
+                image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+
+            # Préparer les données pour la notif
             matricule_data = {
-                'numero': license_plate,
-                'camera_name': camera.name,
-                'location': camera.department.name if camera.department else 'Inconnue',
-                'confidence_score': confidence_score,
+                'matricule': license_plate,
+                'camera': camera.name,
+                'location': camera.department.name if camera.department else 'Inconnu',
+                'timestamp': timezone.now().isoformat(),
+                'confidence': confidence_score,
+                'message': f"🚨 Matricule non autorisé: {license_plate}",
+                'image_base64': image_base64,  # 👍 image incluse ici
                 'detection_id': detection.id
             }
-            
-            # 🚨 NOTIFICATION TEMPS RÉEL
-            send_unauthorized_notification(matricule_data)
-            
+
+            # Envoi WebSocket
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                "notifications",  # nom du groupe dans le consumer
+                {
+                    "type": "send_notification",
+                    "data": matricule_data
+                }
+            )
+
             logging.warning(f"🚨 ALERTE: Matricule non autorisée {license_plate} (Cam: {camera.name})")
         else:
             logging.info(f"✅ Matricule autorisée: {license_plate} (Cam: {camera.name})")
-        
+
         return detection, is_authorized
-        
+
     except Exception as e:
         logging.error(f"❌ Erreur vérification matricule: {e}")
         return None, False
-
 def detect_h264_corruption(img):
     """Détection des artifacts de corruption H.264"""
     
@@ -424,8 +439,9 @@ def run_ocr_task(image_bytes, camera_id):
             
             # 🚨 NOUVEAU: Vérification et notification WebSocket
             detection, is_authorized = check_and_save_detection(
-                best_result, camera_id, best_score
+            best_result, camera_id, best_score, image_bytes=image_bytes
             )
+
             
             return {
                 "success": True,
