@@ -21,6 +21,14 @@ import cv2
 import threading
 import time
 from datetime import datetime
+from gismap.models import DetectionMatricule
+
+def alertes_matricules(request):
+    alertes = DetectionMatricule.objects.filter(est_autorise=False)\
+        .select_related('camera', 'camera__department')\
+        .order_by('-timestamp')[:100]
+    return render(request, 'detections/alert.html', {'alertes': alertes})
+
 
 
 
@@ -309,3 +317,106 @@ def all_cameras_stream(request):
         'selected_departement_id': departement_id,
     }
     return render(request, 'all_cameras.html', context)
+
+
+
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+def alerter_matricule_non_autorise(matricule_detecte):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        "alerts",
+        {
+            "type": "send_alert",
+            "message": "🚨 Matricule non autorisé détecté !",
+            "matricule": matricule_detecte,
+        }
+    )
+from django.shortcuts import render
+
+def test_notification_view(request):
+    return render(request, "test_notification.html")
+
+# gismap/views.py (ajout des nouvelles vues)
+from django.shortcuts import render
+from django.http import JsonResponse
+from .models import DetectionMatricule, Camera, MatriculeAutorise, Lieu
+from django.utils import timezone
+from datetime import timedelta
+
+def notification_dashboard(request):
+    detections = DetectionMatricule.objects.select_related('camera').order_by('-timestamp')
+    return render(request, 'notifications.html', {'detections': detections})
+
+
+def get_recent_detections(request):
+    """API pour récupérer les détections récentes"""
+    try:
+        # Récupérer les 100 dernières détections
+        detections = DetectionMatricule.objects.select_related('camera', 'camera__department').order_by('-date_detection', '-heure_detection')[:100]
+        
+        data = []
+        for d in detections:
+            data.append({
+                'id': d.id,
+                'numero': d.numero,
+                'camera': d.camera.name,
+                'location': d.camera.department.name if d.camera.department else 'Inconnue',
+                'date': d.date_detection.isoformat(),
+                'heure': d.heure_detection.strftime('%H:%M:%S'),
+                'autorise': d.est_autorise,
+                'timestamp': f"{d.date_detection.isoformat()}T{d.heure_detection.isoformat()}"
+            })
+        
+        return JsonResponse({'detections': data})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+def get_dashboard_stats(request):
+    """Statistiques pour le dashboard"""
+    try:
+        today = timezone.now().date()
+        
+        # Statistiques du jour
+        today_detections = DetectionMatricule.objects.filter(date_detection=today)
+        total_today = today_detections.count()
+        unauthorized_today = today_detections.filter(est_autorise=False).count()
+        authorized_today = today_detections.filter(est_autorise=True).count()
+        
+        # Statistiques de la semaine
+        week_ago = today - timedelta(days=7)
+        week_detections = DetectionMatricule.objects.filter(date_detection__gte=week_ago)
+        total_week = week_detections.count()
+        unauthorized_week = week_detections.filter(est_autorise=False).count()
+        
+        # Caméras actives
+        active_cameras = Camera.objects.count()
+        
+        # Matricules autorisées
+        total_authorized_plates = MatriculeAutorise.objects.count()
+        
+        stats = {
+            'today': {
+                'total': total_today,
+                'unauthorized': unauthorized_today,
+                'authorized': authorized_today
+            },
+            'week': {
+                'total': total_week,
+                'unauthorized': unauthorized_week
+            },
+            'cameras': {
+                'active': active_cameras
+            },
+            'plates': {
+                'authorized': total_authorized_plates
+            }
+        }
+        
+        return JsonResponse({'stats': stats})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+

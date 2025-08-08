@@ -99,7 +99,14 @@ TEMPLATES = [
 
 #WSGI_APPLICATION = 'smartVision.wsgi.application'
 ASGI_APPLICATION = "smartVision.application"
-
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
 
 AUTH_USER_MODEL = 'authentification.User'
 
