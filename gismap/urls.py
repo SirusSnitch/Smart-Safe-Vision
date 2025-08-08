@@ -33,6 +33,6 @@ urlpatterns = [
 path('alertes/', notification_dashboard, name='notification_dashboard'),
 
 ]
-]
+
 
 

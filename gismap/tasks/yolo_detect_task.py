@@ -33,16 +33,16 @@ class YOLODetector:
         self.load_model()
 
     def load_model(self):
-        if not torch.cuda.is_available():
-            raise RuntimeError("🚫 CUDA n'est pas disponible.")
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"Modèle non trouvé: {self.model_path}")
         try:
-            self.model = YOLO(self.model_path).to("cuda")
-            logger.info(f"✅ Modèle YOLO chargé: {self.model_path}")
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            self.model = YOLO(self.model_path).to(device)
+            logger.info(f"✅ Modèle YOLO chargé sur {device.upper()}: {self.model_path}")
         except Exception as e:
             logger.error(f"❌ Erreur chargement modèle: {e}")
             raise
+
 
     def detect_plates(self, frame: np.ndarray, conf_threshold: float = 0.25) -> list:
         try:
@@ -50,7 +50,7 @@ class YOLODetector:
                 source=frame,
                 save=False,
                 conf=conf_threshold,
-                device='cuda',
+                device='cuda' if torch.cuda.is_available() else 'cpu',
                 imgsz=(640, 384),
                 verbose=False
             )
