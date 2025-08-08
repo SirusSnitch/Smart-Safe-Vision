@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Alertes Plaques Non Autorisées</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      #alerts {
+        max-width: 600px;
+        margin: auto;
+      }
+      .alert {
+        background: #f8d7da;
+        border: 1px solid #f5c2c7;
+        color: #842029;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+      }
+      .alert .timestamp {
+        font-size: 0.8em;
+        color: #6c757d;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Alertes de plaques non autorisées</h1>
+    <div id="alerts">
+      <!-- Les alertes apparaîtront ici -->
+    </div>
+
+    <script>
+      // Assure-toi que l'URL du WS est correcte selon ta config
+      const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+      const socket = new WebSocket(
+        ws_scheme + "://" + window.location.host + "/ws/notifications/"
+      );
+
+      socket.onopen = function (e) {
+        console.log("Connexion WebSocket établie.");
+      };
+
+      socket.onmessage = function (event) {
+        const data = JSON.parse(event.data);
+
+        if (data.alert_type === "unauthorized_plate") {
+          const alertsDiv = document.getElementById("alerts");
+
+          const alertDiv = document.createElement("div");
+          alertDiv.className = "alert";
+
+          alertDiv.innerHTML = `
+                    <strong>🚨 Matricule non autorisé détecté:</strong> ${
+                      data.matricule
+                    }<br/>
+                    <span><strong>Caméra :</strong> ${data.camera}</span><br/>
+                    <span><strong>Lieu :</strong> ${data.location}</span><br/>
+                    <span><strong>Confiance :</strong> ${data.confidence.toFixed(
+                      2
+                    )}</span><br/>
+                    <span class="timestamp">${new Date(
+                      data.timestamp
+                    ).toLocaleString()}</span>
+                `;
+
+          // Ajoute en haut la nouvelle alerte
+          alertsDiv.prepend(alertDiv);
+        }
+      };
+
+      socket.onclose = function (e) {
+        console.log("Connexion WebSocket fermée.");
+      };
+
+      socket.onerror = function (e) {
+        console.error("Erreur WebSocket: ", e);
+      };
+    </script>
+  </body>
+</html>
