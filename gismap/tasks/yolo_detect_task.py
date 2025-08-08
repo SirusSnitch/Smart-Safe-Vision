@@ -1,5 +1,5 @@
 # ============================================================================
-# YOLO_DETECT_TASK.PY - Version optimisée avec intégration WebSocket et OCR
+# YOLO_DETECT_TASK.PY - Multi-model detection, OCR only on best.pt detections
 # ============================================================================
 
 import base64
@@ -14,7 +14,6 @@ import gc
 import os
 import logging
 from typing import Optional
-# NOUVEAUX IMPORTS POUR WEBSOCKET
 from django.apps import apps
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -22,7 +21,6 @@ from django.utils import timezone
 from django.core.files.base import ContentFile
 from gismap.tasks.ocr_task import run_ocr_task
 
-# Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -42,7 +40,6 @@ class YOLODetector:
         except Exception as e:
             logger.error(f"❌ Erreur chargement modèle: {e}")
             raise
-
 
     def detect_plates(self, frame: np.ndarray, conf_threshold: float = 0.25) -> list:
         try:
@@ -70,8 +67,11 @@ class YOLODetector:
             return [], None
 
 current_dir = os.path.dirname(__file__)
-model_path = os.path.abspath(os.path.join(current_dir, "..", "yolo", "best.pt"))
-detector = YOLODetector(model_path)
+model_path_best = os.path.abspath(os.path.join(current_dir, "..", "yolo", "best.pt"))
+model_path_box = os.path.abspath(os.path.join(current_dir, "..", "yolo", "box.pt"))
+
+detector_best = YOLODetector(model_path_best)
+detector_box = YOLODetector(model_path_box)
 
 try:
     r = redis.StrictRedis(host='localhost', port=6379, db=0, socket_timeout=5)
@@ -152,8 +152,7 @@ def check_and_save_detection(license_plate, camera_id, confidence_score, image_b
         logger.error(f"❌ Erreur vérification matricule: {e}")
         return None, False
 
-def process_detections(frame: np.ndarray, detections: list, camera_id: int) -> np.ndarray:
-
+def process_detections(frame: np.ndarray, detections: list, camera_id: int, run_ocr: bool) -> np.ndarray:
     annotated_frame = frame.copy()
     for detection in detections:
         x1, y1, x2, y2 = detection['bbox']
@@ -167,7 +166,7 @@ def process_detections(frame: np.ndarray, detections: list, camera_id: int) -> n
         x2_crop = min(frame.shape[1], x2 + margin)
         y2_crop = min(frame.shape[0], y2 + margin)
         cropped = frame[y1_crop:y2_crop, x1_crop:x2_crop]
-        if cropped.size > 0:
+        if cropped.size > 0 and run_ocr:
             _, buffer = cv2.imencode('.jpg', cropped, [cv2.IMWRITE_JPEG_QUALITY, 95])
             image_bytes = buffer.tobytes()
             run_ocr_task.delay(image_bytes, camera_id)
@@ -196,18 +195,31 @@ def detect_from_redis(camera_id: int, max_iterations: int = 1000):
                 continue
             consecutive_errors = 0
             frame = cv2.resize(frame, (640, 384))
-            detections, yolo_results = detector.detect_plates(frame)
-            if detections:
-                logger.info(f"🎯 {len(detections)} plaque(s) détectée(s) (Cam {camera_id})")
-                annotated_frame = process_detections(frame, detections, camera_id)
+
+            # --- Detect with best.pt and box.pt separately ---
+            detections_best, _ = detector_best.detect_plates(frame)
+            detections_box, _ = detector_box.detect_plates(frame)
+
+            # --- Annotate and run OCR only for best.pt detections ---
+            annotated_frame = frame.copy()
+            if detections_best:
+                annotated_frame = process_detections(frame, detections_best, camera_id, run_ocr=True)
+                logger.info(f"🎯 {len(detections_best)} plaque(s) détectée(s) par best.pt (Cam {camera_id})")
             else:
-                annotated_frame = frame
+                logger.info(f"🎯 Aucune plaque détectée par best.pt (Cam {camera_id})")
+
+            # --- Annotate box.pt detections, but skip OCR ---
+            if detections_box:
+                annotated_frame = process_detections(annotated_frame, detections_box, camera_id, run_ocr=False)
+                logger.info(f"📦 {len(detections_box)} objet(s) détecté(s) par box.pt (Cam {camera_id})")
+            else:
+                logger.info(f"📦 Aucun objet détecté par box.pt (Cam {camera_id})")
+
             if os.getenv('ENABLE_DISPLAY', 'true').lower() == 'true':
                 cv2.imshow(f"🎯 Caméra {camera_id}", annotated_frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
-            if yolo_results:
-                del yolo_results
+
             torch.cuda.empty_cache()
             gc.collect()
             time.sleep(0.1)
