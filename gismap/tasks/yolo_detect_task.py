@@ -45,6 +45,7 @@ class YOLODetector:
             logger.error(f"❌ Erreur chargement modèle: {e}")
             raise
 
+    # --- Modified detect_plates to include class_name for box.pt model ---
     def detect_plates(self, frame: np.ndarray, conf_threshold: float = 0.25) -> tuple:
         try:
             results = self.model.predict(
@@ -61,9 +62,12 @@ class YOLODetector:
                     for box in result.boxes:
                         x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                         confidence = float(box.conf[0])
+                        class_id = int(box.cls[0])
+                        class_name = self.model.names[class_id] if hasattr(self.model, 'names') else str(class_id)
                         detections.append({
                             'bbox': (x1, y1, x2, y2),
-                            'confidence': confidence
+                            'confidence': confidence,
+                            'class_name': class_name  # <-- added class_name here
                         })
             return detections, results
         except Exception as e:
@@ -253,6 +257,28 @@ def classify_pose(result, image_height):
         persons.append((label, kp))
     return persons
 
+# --- New helper to send generic detection notifications ---
+@shared_task
+def send_generic_detection_notification(alert_type, camera_id, label, details=None):
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            notification_data = {
+                'type': 'send_notification',
+                'data': {
+                    'alert_type': alert_type,
+                    'camera_id': camera_id,
+                    'label': label,
+                    'details': details or {},
+                    'timestamp': timezone.now().isoformat(),
+                    'message': f"⚠️ {label} détecté"
+                }
+            }
+            async_to_sync(channel_layer.group_send)('notifications', notification_data)
+            logger.info(f"📢 Notification envoyée: {label} (Cam {camera_id})")
+    except Exception as e:
+        logger.error(f"❌ Erreur notification générique: {e}")
+
 # --- Main detection task ---
 @shared_task
 def detect_from_redis(camera_id: int, max_iterations: int = 1000):
@@ -291,6 +317,16 @@ def detect_from_redis(camera_id: int, max_iterations: int = 1000):
             if detections_box:
                 annotated_frame = process_detections(annotated_frame, detections_box, camera_id, run_ocr=False)
                 logger.info(f"📦 {len(detections_box)} objet(s) détecté(s) par box.pt (Cam {camera_id})")
+
+                # --- NEW: Send notification only for 'human-boxes' detections ---
+                for det in detections_box:
+                    if det.get('class_name') == "human-boxes":
+                        send_generic_detection_notification.delay(
+                            alert_type="human_box_detected",
+                            camera_id=camera_id,
+                            label="Human Boxes",
+                            details={"bbox": det['bbox'], "confidence": det['confidence']}
+                        )
             else:
                 logger.info(f"📦 Aucun objet détecté par box.pt (Cam {camera_id})")
 
@@ -312,6 +348,15 @@ def detect_from_redis(camera_id: int, max_iterations: int = 1000):
                 color = (0, 0, 255) if label == "Fallen" else (0, 165, 255) if label == "Aggression" else (0, 255, 0)
                 cv2.putText(annotated_frame, label, (int(x0), int(y0) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
                 cv2.circle(annotated_frame, (int(x0), int(y0)), 5, (255, 0, 0), -1)
+
+                # --- NEW: Send notifications only for Fallen and Aggression ---
+                if label in ("Fallen", "Aggression"):
+                    send_generic_detection_notification.delay(
+                        alert_type=label.lower(),
+                        camera_id=camera_id,
+                        label=label,
+                        details={"keypoints": kp.tolist()}
+                    )
 
             if os.getenv('ENABLE_DISPLAY', 'true').lower() == 'true':
                 cv2.imshow(f"🎯 Caméra {camera_id}", annotated_frame)
