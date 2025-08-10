@@ -429,3 +429,77 @@ def test_notification_system():
     except Exception as e:
         logger.error(f"[TEST] Erreur test notifications: {e}")
         return {"success": False, "error": str(e)}
+    
+
+# the new alerts for human related incidents 
+
+# ... your existing code unchanged above ...
+
+@shared_task
+def send_human_boxes_alert(camera_id, camera_name=None, details=None):
+    """
+    Envoyer une notification quand une personne porte une boîte est détectée
+    """
+    try:
+        message = "🚨 Personne avec boîte détectée"
+        send_system_alert.delay(
+            message=message,
+            alert_type="human_boxes",
+            priority="medium",
+            details={
+                "camera_id": camera_id,
+                "camera_name": camera_name,
+                **(details or {})
+            }
+        )
+        logger.info(f"[NOTIF] Alerte human-boxes envoyée - Caméra {camera_id}")
+        return {"success": True, "camera_id": camera_id}
+    except Exception as e:
+        logger.error(f"[NOTIF] Erreur envoi alerte human-boxes: {e}")
+        return {"success": False, "error": str(e)}
+
+@shared_task
+def send_fallen_alert(camera_id, camera_name=None, details=None):
+    """
+    Envoyer une notification quand une personne tombée est détectée
+    """
+    try:
+        message = "⚠️ Personne tombée détectée"
+        send_system_alert.delay(
+            message=message,
+            alert_type="fallen",
+            priority="high",
+            details={
+                "camera_id": camera_id,
+                "camera_name": camera_name,
+                **(details or {})
+            }
+        )
+        logger.info(f"[NOTIF] Alerte Fallen envoyée - Caméra {camera_id}")
+        return {"success": True, "camera_id": camera_id}
+    except Exception as e:
+        logger.error(f"[NOTIF] Erreur envoi alerte Fallen: {e}")
+        return {"success": False, "error": str(e)}
+
+@shared_task
+def send_aggression_alert(camera_id, camera_name=None, details=None):
+    """
+    Envoyer une notification quand une agression est détectée
+    """
+    try:
+        message = "⚠️ Agression détectée"
+        send_system_alert.delay(
+            message=message,
+            alert_type="aggression",
+            priority="high",
+            details={
+                "camera_id": camera_id,
+                "camera_name": camera_name,
+                **(details or {})
+            }
+        )
+        logger.info(f"[NOTIF] Alerte Aggression envoyée - Caméra {camera_id}")
+        return {"success": True, "camera_id": camera_id}
+    except Exception as e:
+        logger.error(f"[NOTIF] Erreur envoi alerte Aggression: {e}")
+        return {"success": False, "error": str(e)}
