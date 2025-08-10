@@ -1,47 +1,288 @@
-<table id="notification-table" border="1">
-  <thead>
-    <tr>
-      <th>Matricule</th>
-      <th>Caméra</th>
-      <th>Lieu</th>
-      <th>Date</th>
-      <th>Confiance</th>
-      <th>Message</th>
-      <th>Image</th>
-    </tr>
-  </thead>
-  <tbody id="notification-body"></tbody>
-</table>
+{% extends 'base.html' %} {% block title %} Notifications en Temps Réel -
+SmartVision {% endblock %} {% block content %}
+<div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">
+      Notifications en Temps Réel
+    </h1>
+    <div class="flex items-center space-x-3">
+      <span
+        class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
+      >
+        <i class="fas fa-wifi mr-1"></i> Connexion WebSocket active
+      </span>
+      <button
+        id="clear-btn"
+        class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition"
+      >
+        <i class="fas fa-trash-alt mr-2"></i>Effacer
+      </button>
+    </div>
+  </div>
+
+  <div class="overflow-x-auto rounded-lg border border-gray-200">
+    <table id="notification-table" class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th
+            scope="col"
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+          >
+            Matricule
+          </th>
+          <th
+            scope="col"
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+          >
+            Caméra
+          </th>
+          <th
+            scope="col"
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+          >
+            Lieu
+          </th>
+          <th
+            scope="col"
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+          >
+            Date
+          </th>
+          <th
+            scope="col"
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+          >
+            Confiance
+          </th>
+          <th
+            scope="col"
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+          >
+            Message
+          </th>
+          <th
+            scope="col"
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+          >
+            Image
+          </th>
+        </tr>
+      </thead>
+      <tbody id="notification-body" class="bg-white divide-y divide-gray-200">
+        <!-- Les notifications seront ajoutées ici dynamiquement -->
+        <tr id="empty-state">
+          <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+            <i class="fas fa-inbox text-4xl text-gray-300 mb-3"></i>
+            <p class="text-lg">Aucune notification reçue</p>
+            <p class="text-sm mt-2">
+              Les nouvelles détections apparaîtront ici en temps réel
+            </p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mt-6 flex items-center text-sm text-gray-500">
+    <i class="fas fa-info-circle mr-2 text-blue-500"></i>
+    Ce tableau se met à jour automatiquement grâce à une connexion WebSocket
+    avec le serveur
+  </div>
+</div>
 
 <script>
-  const socket = new WebSocket(
-    "ws://" + window.location.host + "/ws/notifications/"
-  );
-
-  socket.onmessage = function (event) {
-    console.log("Message reçu :", event.data);
-
-    const data = JSON.parse(event.data);
+  document.addEventListener("DOMContentLoaded", function () {
     const tableBody = document.getElementById("notification-body");
+    const emptyState = document.getElementById("empty-state");
+    const clearBtn = document.getElementById("clear-btn");
 
-    const row = document.createElement("tr");
+    // Sélecteurs pour badge notification dans la navbar
+    const notifBtn = document.getElementById("notif-btn");
+    const notifBadge = document.getElementById("notif-badge");
 
-    // Construction dynamique de l'image si présente
-    let imageHtml = "—";
-    if (data.image_base64) {
-      imageHtml = `<img src="data:image/jpeg;base64,${data.image_base64}" width="150" />`;
+    let unreadCount = 0;
+
+    // Établir la connexion WebSocket
+    const socket = new WebSocket(
+      "ws://" + window.location.host + "/ws/notifications/"
+    );
+
+    // Gérer les erreurs de connexion
+    socket.onerror = function (error) {
+      console.error("Erreur WebSocket:", error);
+      showError(
+        "Erreur de connexion au serveur. Actualisez la page pour réessayer."
+      );
+    };
+
+    // Fonction pour afficher une erreur
+    function showError(message) {
+      const errorRow = document.createElement("tr");
+      errorRow.innerHTML = `
+            <td colspan="7" class="px-6 py-4 bg-red-50 text-red-700">
+                <i class="fas fa-exclamation-triangle mr-2"></i>${message}
+            </td>
+        `;
+      tableBody.appendChild(errorRow);
     }
 
-    row.innerHTML = `
-      <td>${data.matricule ?? "—"}</td>
-      <td>${data.camera}</td>
-      <td>${data.location}</td>
-      <td>${new Date(data.timestamp).toLocaleString()}</td>
-      <td>${data.confidence?.toFixed(2) ?? "N/A"}</td>
-      <td>${data.message}</td>
-      <td>${imageHtml}</td> <!-- ✅ affichage image -->
-    `;
+    // Gérer les messages entrants
+    socket.onmessage = function (event) {
+      console.log("Message reçu:", event.data);
+      const data = JSON.parse(event.data);
 
-    tableBody.prepend(row);
-  };
+      // Supprimer l'état vide s'il existe
+      if (emptyState) emptyState.remove();
+
+      // Créer une nouvelle ligne
+      const row = document.createElement("tr");
+      row.className = "notification-row hover:bg-gray-50 transition";
+
+      // Formater la date
+      const date = new Date(data.timestamp);
+      const formattedDate = date.toLocaleString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+      // Créer l'élément image si disponible
+      let imageHtml = '<span class="text-gray-400">—</span>';
+      if (data.image_base64) {
+        imageHtml = `
+                <div class="relative group">
+                    <img src="data:image/jpeg;base64,${data.image_base64}" 
+                         alt="Détection" 
+                         class="w-24 h-16 object-cover rounded-md shadow border">
+                    <div class="hidden group-hover:block absolute top-0 left-0 w-64 h-48 z-10 shadow-xl">
+                        <img src="data:image/jpeg;base64,${data.image_base64}" 
+                             alt="Détection agrandie" 
+                             class="w-full h-full object-contain">
+                    </div>
+                </div>
+            `;
+      }
+
+      // Déterminer la couleur de la confiance
+      let confidenceClass = "text-gray-500";
+      if (data.confidence) {
+        if (data.confidence > 0.8) confidenceClass = "text-green-600 font-bold";
+        else if (data.confidence > 0.5) confidenceClass = "text-blue-600";
+        else confidenceClass = "text-orange-500";
+      }
+
+      // Construire le contenu de la ligne
+      row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="font-mono bg-gray-100 px-2 py-1 rounded">${
+                  data.matricule ?? "—"
+                }</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">${data.camera}</td>
+            <td class="px-6 py-4 whitespace-nowrap">${data.location}</td>
+            <td class="px-6 py-4 whitespace-nowrap">${formattedDate}</td>
+            <td class="px-6 py-4 whitespace-nowrap ${confidenceClass}">
+                ${
+                  data.confidence
+                    ? (data.confidence * 100).toFixed(1) + "%"
+                    : "N/A"
+                }
+            </td>
+            <td class="px-6 py-4">
+                <div class="flex items-center">
+                    <span class="mr-2 text-${
+                      data.message.includes("détecté") ? "green" : "red"
+                    }-500">
+                        <i class="fas fa-${
+                          data.message.includes("détecté")
+                            ? "check-circle"
+                            : "exclamation-triangle"
+                        }"></i>
+                    </span>
+                    ${data.message}
+                </div>
+            </td>
+            <td class="px-6 py-4">${imageHtml}</td>
+        `;
+
+      // Ajouter la nouvelle ligne en haut du tableau
+      tableBody.prepend(row);
+
+      // Animation nouvelle ligne
+      row.animate(
+        [
+          { backgroundColor: "rgba(66, 153, 225, 0.3)" },
+          { backgroundColor: "transparent" },
+        ],
+        { duration: 1500, easing: "ease-out" }
+      );
+
+      // --- Mise à jour du badge notification dans la navbar ---
+      unreadCount++;
+      notifBadge.textContent = unreadCount;
+      notifBadge.style.display = "flex";
+    };
+
+    // Réinitialiser compteur au clic sur l’icône notification dans navbar
+    notifBtn.addEventListener("click", () => {
+      unreadCount = 0;
+      notifBadge.style.display = "none";
+    });
+
+    // Gestion bouton Effacer
+    clearBtn.addEventListener("click", function () {
+      const rows = document.querySelectorAll(".notification-row");
+      rows.forEach((row) => row.remove());
+
+      if (!emptyState) {
+        const newEmptyState = document.createElement("tr");
+        newEmptyState.id = "empty-state";
+        newEmptyState.innerHTML = `
+                <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                    <i class="fas fa-inbox text-4xl text-gray-300 mb-3"></i>
+                    <p class="text-lg">Aucune notification reçue</p>
+                    <p class="text-sm mt-2">Les nouvelles détections apparaîtront ici en temps réel</p>
+                </td>
+            `;
+        tableBody.appendChild(newEmptyState);
+      }
+    });
+  });
 </script>
+
+<style>
+  #notification-table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  #notification-table th {
+    position: sticky;
+    top: 0;
+    background-color: #f9fafb;
+    z-index: 10;
+  }
+
+  .notification-row td {
+    border-top: 1px solid #edf2f7;
+  }
+
+  .notification-row:first-child td {
+    border-top: none;
+  }
+
+  .notification-row:hover {
+    background-color: #f7fafc;
+  }
+
+  .group-hover\:block {
+    display: none;
+  }
+
+  .group:hover .group-hover\:block {
+    display: block;
+  }
+</style>
+{% endblock %}

@@ -8,12 +8,12 @@ import logging
 
 # NOUVEAUX IMPORTS POUR WEBSOCKET
 from django.apps import apps
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
 from django.utils import timezone
 from django.core.files.base import ContentFile
 import base64
-from django.core.files.storage import default_storage
+
+# IMPORT DU NOUVEAU SERVICE
+from .notification_service import NotificationService
 
 # Configuration Tesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -21,60 +21,22 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 # Redis Connection
 r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
-# NOUVELLE FONCTION: Notification WebSocket
-
-def send_unauthorized_notification(matricule_data):
-    """Version améliorée avec plus de debug"""
-    try:
-        channel_layer = get_channel_layer()
-        
-        if not channel_layer:
-            logging.error("❌ Channel layer non disponible")
-            return False
-        
-        notification_data = {
-            'type': 'send_notification',  # IMPORTANT: doit correspondre à la méthode du consumer
-            'data': {
-                'alert_type': 'unauthorized_plate',
-                'matricule': matricule_data['numero'],
-                'camera': matricule_data['camera_name'],
-                'location': matricule_data.get('location', 'Inconnue'),
-                'timestamp': timezone.now().isoformat(),
-                'confidence': matricule_data.get('confidence_score', 0),
-                'detection_id': matricule_data.get('detection_id', None),
-                'message': f"🚨 Matricule non autorisé: {matricule_data['numero']}"
-            }
-        }
-        
-        # Debug: vérifier les données
-        logging.info(f"📊 Données notification: {notification_data['data']}")
-        
-        # Envoi avec vérification
-        async_to_sync(channel_layer.group_send)(
-            'notifications',
-            notification_data
-        )
-        
-        logging.info(f"📢 Notification WebSocket envoyée avec succès: {matricule_data['numero']}")
-        return True
-        
-    except Exception as e:
-        logging.error(f"❌ Erreur notification WebSocket: {e}")
-        import traceback
-        logging.error(f"❌ Traceback: {traceback.format_exc()}")
-        return False
-# NOUVELLE FONCTION: Vérification et sauvegarde
-  # NOUVELLE FONCTION: Vérification et sauvegarde
 def check_and_save_detection(license_plate, camera_id, confidence_score, image_bytes=None):
-    """Vérifie autorisation et envoie notification si nécessaire"""
+    """Vérifie autorisation et utilise le service unifié pour les notifications"""
+    detection = None
     try:
         # Import des modèles Django
         DetectionMatricule = apps.get_model('gismap', 'DetectionMatricule')
         MatriculeAutorise = apps.get_model('gismap', 'MatriculeAutorise')
         Camera = apps.get_model('gismap', 'Camera')
 
-        # Récupérer la caméra
-        camera = Camera.objects.get(id=camera_id)
+        # Récupérer la caméra avec vérification d'existence
+        try:
+            camera = Camera.objects.get(id=camera_id)
+            logging.info(f"📷 Caméra trouvée: {camera.name} (ID: {camera_id})")
+        except Camera.DoesNotExist:
+            logging.error(f"❌ Caméra avec ID {camera_id} n'existe pas dans la base de données")
+            return None, False
 
         # Vérifier si autorisé dans ce lieu
         is_authorized = False
@@ -83,56 +45,62 @@ def check_and_save_detection(license_plate, camera_id, confidence_score, image_b
                 numero=license_plate,
                 lieu=camera.department
             ).exists()
+            logging.info(f"🔍 Vérification autorisation pour {license_plate} dans {camera.department.name}: {'✅' if is_authorized else '❌'}")
+        else:
+            logging.warning(f"⚠️ Caméra {camera.name} n'a pas de département assigné")
 
-        # Créer l'instance de détection (image sera ajoutée ensuite)
-        detection = DetectionMatricule.objects.create(
-            numero=license_plate,
-            camera=camera,
-            est_autorise=is_authorized
-        )
-
-        # Stocker directement l’image dans la base de données
-        if image_bytes:
-           detection.image = image_bytes
-           detection.save()
-        # 🚨 Si matricule non autorisée → envoyer la notification WebSocket
-        if not is_authorized:
-            # Encoder l'image en base64 pour l’envoyer
-            image_base64 = None
-            if image_bytes:
-                image_base64 = base64.b64encode(image_bytes).decode('utf-8')
-
-            # Préparer les données pour la notif
-            matricule_data = {
-                'matricule': license_plate,
-                'camera': camera.name,
-                'location': camera.department.name if camera.department else 'Inconnu',
-                'timestamp': timezone.now().isoformat(),
-                'confidence': confidence_score,
-                'message': f"🚨 Matricule non autorisé: {license_plate}",
-                'image_base64': image_base64,  # 👍 image incluse ici
-                'detection_id': detection.id
-            }
-
-            # Envoi WebSocket
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                "notifications",  # nom du groupe dans le consumer
-                {
-                    "type": "send_notification",
-                    "data": matricule_data
-                }
+        # Créer l'instance de détection avec gestion d'erreurs
+        try:
+            detection = DetectionMatricule.objects.create(
+                numero=license_plate,
+                camera=camera,
+                est_autorise=is_authorized
             )
+            logging.info(f"💾 DetectionMatricule créée avec ID: {detection.id}")
+        except Exception as create_error:
+            logging.error(f"❌ Erreur création DetectionMatricule: {create_error}")
+            return None, False
 
-            logging.warning(f"🚨 ALERTE: Matricule non autorisée {license_plate} (Cam: {camera.name})")
+        # Stocker l'image dans DetectionMatricule avec vérifications
+        if image_bytes and detection:
+            try:
+                filename = f"{timezone.now().strftime('%Y%m%d_%H%M%S')}_{license_plate.replace(' ', '_')}.jpg"
+                detection.image.save(filename, ContentFile(image_bytes), save=True)
+                logging.info(f"🖼️ Image sauvegardée dans DetectionMatricule: {filename}")
+            except Exception as img_error:
+                logging.error(f"❌ Erreur sauvegarde image DetectionMatricule: {img_error}")
+                # On continue même si l'image échoue
+
+        # 🚨 NOUVELLE LOGIQUE : Utiliser NotificationService
+        if not is_authorized:
+            # Envoyer notification matricule non autorisée
+            try:
+                notification_obj = NotificationService.send_unauthorized_plate_notification(
+                    matricule=license_plate,
+                    camera=camera.name,  # Nom de la caméra
+                    location=camera.department.name if camera.department else 'Inconnu',
+                    confidence=confidence_score,
+                    image_bytes=image_bytes,
+                    detection_id=detection.id if detection else None
+                )
+                
+                logging.warning(f"🚨 ALERTE: Matricule non autorisée {license_plate} (Cam: {camera.name})")
+                logging.info(f"📝 Notification ID: {notification_obj.id if notification_obj else 'Échec sauvegarde'}")
+            except Exception as notif_error:
+                logging.error(f"❌ Erreur envoi notification: {notif_error}")
+                # On continue même si la notification échoue
+                
         else:
             logging.info(f"✅ Matricule autorisée: {license_plate} (Cam: {camera.name})")
 
         return detection, is_authorized
 
     except Exception as e:
-        logging.error(f"❌ Erreur vérification matricule: {e}")
+        logging.error(f"❌ Erreur générale vérification matricule: {e}")
+        import traceback
+        logging.error(traceback.format_exc())
         return None, False
+
 def detect_h264_corruption(img):
     """Détection des artifacts de corruption H.264"""
     
@@ -437,11 +405,10 @@ def run_ocr_task(image_bytes, camera_id):
             # Sauvegarder dans Redis
             r.set(f"detected_plate_{camera_id}", best_result, ex=30)
             
-            # 🚨 NOUVEAU: Vérification et notification WebSocket
+            # 🚨 NOUVEAU: Vérification et notification avec service unifié
             detection, is_authorized = check_and_save_detection(
-            best_result, camera_id, best_score, image_bytes=image_bytes
+                best_result, camera_id, best_score, image_bytes=image_bytes
             )
-
             
             return {
                 "success": True,
@@ -449,8 +416,8 @@ def run_ocr_task(image_bytes, camera_id):
                 "confidence_score": best_score,
                 "h264_corruption": processed_data['corruption_detected'],
                 "detection_method": best_method,
-                "is_authorized": is_authorized,  # Nouveau champ
-                "detection_id": detection.id if detection else None  # Nouveau champ
+                "is_authorized": is_authorized,
+                "detection_id": detection.id if detection else None
             }
         
         logging.error(f"❌ Échec OCR Cam {camera_id} - Score: {best_score}, H.264: {processed_data['corruption_detected']}")

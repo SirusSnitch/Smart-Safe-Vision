@@ -22,13 +22,43 @@ import threading
 import time
 from datetime import datetime
 from gismap.models import DetectionMatricule
+# Dans votre views.py, ajoutez cette vue pour servir les images depuis la base :
 
+from django.http import HttpResponse, Http404
+from django.shortcuts import get_object_or_404
+from .models import Notifications
+
+def notification_image(request, notification_id):
+    """
+    Vue pour servir les images des notifications depuis la base de données
+    """
+    try:
+        notification = get_object_or_404(Notifications, id=notification_id)
+        
+        if not notification.image_data:
+            raise Http404("Image non trouvée")
+        
+        # Déterminer le content type
+        content_type = f"image/{notification.image_type}"
+        
+        # Retourner l'image
+        response = HttpResponse(notification.image_data, content_type=content_type)
+        response['Content-Disposition'] = f'inline; filename="notification_{notification_id}.{notification.image_type}"'
+        
+        return response
+        
+    except Exception as e:
+        raise Http404(f"Erreur: {e}")
 def alertes_matricules(request):
     alertes = DetectionMatricule.objects.filter(est_autorise=False)\
         .select_related('camera', 'camera__department')\
         .order_by('-timestamp')[:100]
     return render(request, 'detections/alert.html', {'alertes': alertes})
 
+from django.shortcuts import render
+
+def notifications_view(request):
+    return render(request, 'notifications.html')
 
 
 

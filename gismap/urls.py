@@ -5,7 +5,7 @@ from .streaming_views import all_cameras_stream,stream_camera_view
 
 from .views import test_notification_view
 from . import views
-from .views import notification_dashboard
+from .views import notification_dashboard ,notifications_view
 
 
 
@@ -30,9 +30,10 @@ urlpatterns = [
    # path('api/detections/', views.get_recent_detections, name='recent_detections'),
    # path('api/stats/', views.get_dashboard_stats, name='dashboard_stats'),
 
-path('alertes/', notification_dashboard, name='notification_dashboard'),
+path('alertes/', notifications_view, name='notifications'),
+    path('notifications/', notifications_view, name='notifications'),
+ path('notification/image/<int:notification_id>/', views.notification_image, name='notification_image'),
+]
 
-]
-]
 
 
