@@ -1,5 +1,5 @@
 <!-- Top Navigation -->
-<header class="bg-white shadow-sm z-30">
+<header class="bg-white shadow-sm" style="z-index: 2000 !important">
   <div class="flex items-center justify-between px-4 py-3">
     <!-- Mobile menu button -->
     <button
@@ -21,20 +21,53 @@
       </svg>
     </button>
 
-    <!-- Right side (user dropdown and notifications) -->
-    <div class="flex items-center space-x-4 ml-auto">
+    <!-- Right side (notifications + user menu) -->
+    <div
+      class="flex items-center space-x-4 ml-auto"
+      style="position: relative; z-index: 2001"
+    >
       <!-- Notifications -->
-      <button
-        id="notif-btn"
-        class="p-1 text-gray-500 rounded-full hover:text-gray-700 focus:outline-none relative"
-      >
-        <span class="material-symbols-outlined">notifications</span>
-        <span
-          id="notif-badge"
-          class="absolute top-0 right-0 min-w-[16px] h-4 px-1 text-xs font-bold text-white bg-red-600 rounded-full flex items-center justify-center"
-          style="display: none"
-        ></span>
-      </button>
+      <div class="relative">
+        <button
+          id="notif-btn"
+          class="p-1 text-gray-500 rounded-full hover:text-gray-700 focus:outline-none relative"
+          style="z-index: 2001"
+        >
+          <span class="material-symbols-outlined">notifications</span>
+          <span
+            id="notif-badge"
+            class="absolute top-0 right-0 min-w-[16px] h-4 px-1 text-xs font-bold text-white bg-red-600 rounded-full flex items-center justify-center"
+            style="display: none; z-index: 2002"
+          ></span>
+        </button>
+
+        <!-- Dropdown -->
+        <div
+          id="notif-dropdown"
+          class="hidden absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg border border-gray-200"
+          style="z-index: 2002 !important"
+        >
+          <div class="p-3 border-b text-gray-700 font-semibold">
+            Notifications récentes
+          </div>
+          <ul
+            id="notif-list"
+            class="max-h-80 overflow-y-auto divide-y divide-gray-100"
+          >
+            <li class="p-3 text-gray-500 text-sm text-center">
+              Aucune notification
+            </li>
+          </ul>
+          <div class="p-2 border-t text-center">
+            <a
+              href="{% url 'notifications' %}"
+              class="text-blue-600 text-sm hover:underline"
+            >
+              Voir toutes les notifications
+            </a>
+          </div>
+        </div>
+      </div>
 
       <!-- User dropdown -->
       <div class="relative">
@@ -46,7 +79,8 @@
         <!-- Dropdown menu -->
         <div
           id="user-dropdown"
-          class="absolute right-0 hidden w-48 py-1 mt-2 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-40"
+          class="absolute right-0 hidden w-48 py-1 mt-2 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+          style="z-index: 2002 !important"
         >
           <div class="px-4 py-3 border-b border-gray-100">
             <p class="text-sm font-medium text-gray-900">{{ user.role }}</p>
@@ -76,3 +110,71 @@
     </div>
   </div>
 </header>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const notifBtn = document.getElementById("notif-btn");
+    const notifBadge = document.getElementById("notif-badge");
+    const notifDropdown = document.getElementById("notif-dropdown");
+    const notifList = document.getElementById("notif-list");
+
+    let unreadCount = 0;
+    let notifData = [];
+
+    // Toggle affichage dropdown
+    notifBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      notifDropdown.classList.toggle("hidden");
+      unreadCount = 0;
+      notifBadge.style.display = "none";
+    });
+
+    // Fermer dropdown si clic à l'extérieur
+    document.addEventListener("click", (e) => {
+      if (!notifBtn.contains(e.target) && !notifDropdown.contains(e.target)) {
+        notifDropdown.classList.add("hidden");
+      }
+    });
+
+    // WebSocket pour recevoir les notifications
+    const socket = new WebSocket(
+      "ws://" + window.location.host + "/ws/notifications/"
+    );
+
+    socket.onmessage = function (event) {
+      const data = JSON.parse(event.data);
+      notifData.unshift(data);
+      if (notifData.length > 10) notifData.pop();
+      renderNotifList();
+      unreadCount++;
+      notifBadge.textContent = unreadCount;
+      notifBadge.style.display = "flex";
+    };
+
+    function renderNotifList() {
+      notifList.innerHTML = "";
+      notifData.forEach((n) => {
+        const li = document.createElement("li");
+        li.className =
+          "p-3 hover:bg-gray-50 cursor-pointer flex items-start space-x-2";
+        let icon = n.message.includes("détecté")
+          ? '<i class="fas fa-check-circle text-green-500"></i>'
+          : '<i class="fas fa-exclamation-triangle text-red-500"></i>';
+        li.innerHTML = `
+          <div class="flex-shrink-0">${icon}</div>
+          <div class="flex-1">
+            <p class="text-sm font-medium text-gray-800">${n.message}</p>
+            <p class="text-xs text-gray-500">
+              ${new Date(n.timestamp).toLocaleString("fr-FR")}
+            </p>
+          </div>
+        `;
+        notifList.appendChild(li);
+      });
+
+      if (notifData.length === 0) {
+        notifList.innerHTML = `<li class="p-3 text-gray-500 text-sm text-center">Aucune notification</li>`;
+      }
+    }
+  });
+</script>

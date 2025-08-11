@@ -1,6 +1,4 @@
-{% extends 'base.html' %} 
-{% load static %} 
-{% block content %}
+{% extends 'base.html' %} {% load static %} {% block content %}
 <!DOCTYPE html>
 <html lang="fr">
   <head>
@@ -9,13 +7,24 @@
     <title>ISGB - Gestion des Départements</title>
 
     <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
     <link rel="stylesheet" href="{% static 'css/map.css' %}" />
 
     <style>
-      body, html {
+      /* Styles spécifiques à cette page */
+      body,
+      html {
         height: 100%;
         margin: 0;
         padding: 0;
@@ -33,18 +42,20 @@
         flex: 1;
         position: relative;
         transition: width 0.3s ease;
+        z-index: 10; /* Niveau de base pour la carte */
       }
 
       #map {
         height: 100%;
         width: 100%;
+        z-index: 1 !important; /* Bas niveau pour la carte elle-même */
       }
 
       .sidebar-toggle-arrow {
         position: absolute;
         top: 20px;
         left: 310px;
-        z-index: 1500;
+        z-index: 1500 !important; /* Au-dessus de la sidebar */
         background-color: var(--primary);
         color: white;
         border: none;
@@ -67,17 +78,19 @@
         width: 100%;
       }
 
+      /* Positionnement des stats au-dessus de la carte */
       .stats-container {
         position: absolute;
         top: 20px;
         right: 20px;
-        z-index: 1000;
-        background-color: rgba(255, 255, 255, 0.8);
+        z-index: 1000 !important; /* Au-dessus de la carte */
+        background-color: rgba(255, 255, 255, 0.9);
         padding: 15px;
         border-radius: 5px;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
         display: flex;
         gap: 20px;
+        backdrop-filter: blur(5px);
       }
 
       .stat-item {
@@ -88,16 +101,31 @@
       .stat-value {
         font-weight: bold;
         font-size: 1.2em;
+        color: var(--secondary);
       }
 
       .stat-label {
         font-size: 0.8em;
         color: #555;
       }
+
+      /* Correction z-index pour la navbar */
+      header {
+        position: relative;
+        z-index: 2000 !important;
+      }
+
+      /* Assurance que les dropdowns sont au-dessus de tout */
+      #notif-dropdown,
+      #user-dropdown {
+        z-index: 2001 !important;
+      }
     </style>
   </head>
 
   <body>
+    <!-- Navbar sera incluse via l'extension de base.html -->
+
     <div class="main-container">
       <!-- Sidebar -->
       <div class="sidebar" id="sidebar">
@@ -134,7 +162,7 @@
         </div>
       </div>
 
-      <!-- Bouton de toggle (replacé proprement) -->
+      <!-- Bouton de toggle sidebar -->
       <div id="sidebar-toggle-arrow" class="sidebar-toggle-arrow">
         <i class="fas fa-chevron-left"></i>
       </div>
@@ -174,18 +202,29 @@
           </div>
           <div class="legend-content">
             <div class="legend-item">
-              <div class="legend-color" style="background-color: rgba(0, 0, 255, 0.3); border: 2px solid blue;"></div>
+              <div
+                class="legend-color"
+                style="
+                  background-color: rgba(0, 0, 255, 0.3);
+                  border: 2px solid blue;
+                "
+              ></div>
               <span class="legend-label">Périmètre ISGB</span>
             </div>
             <div class="legend-item">
-              <div class="legend-color" style="background-color: rgba(255, 120, 0, 0.4); border: 2px solid #ff7800;"></div>
+              <div
+                class="legend-color"
+                style="
+                  background-color: rgba(255, 120, 0, 0.4);
+                  border: 2px solid #ff7800;
+                "
+              ></div>
               <span class="legend-label">Départements</span>
             </div>
           </div>
         </div>
       </div>
     </div>
-    
 
     <!-- Librairies JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -195,7 +234,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="{% static 'js/map.js' %}"></script>
 
-    <!-- Script d'initialisation -->
     <script>
       const urlConfig = {
         getPolygons: "{% url 'get_polygons' %}",
@@ -211,20 +249,17 @@
 
       var currentUserRole = "{{ request.user.role|default:'guest' }}";
 
-    const mainContainer = document.querySelector(".main-container");
-const toggleArrow = document.getElementById("sidebar-toggle-arrow");
-const icon = toggleArrow.querySelector("i");
+      const mainContainer = document.querySelector(".main-container");
+      const toggleArrow = document.getElementById("sidebar-toggle-arrow");
+      const icon = toggleArrow.querySelector("i");
 
-toggleArrow.addEventListener("click", () => {
-  mainContainer.classList.toggle("collapsed");
-  icon.classList.toggle("fa-chevron-left");
-  icon.classList.toggle("fa-chevron-right");
-});
-
-
+      toggleArrow.addEventListener("click", () => {
+        mainContainer.classList.toggle("collapsed");
+        icon.classList.toggle("fa-chevron-left");
+        icon.classList.toggle("fa-chevron-right");
+      });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   </body>
 </html>
 {% endblock %}
-

@@ -58,13 +58,13 @@ from celery.schedules import timedelta
 
 
 CELERY_BEAT_SCHEDULE = {
-    'stream-all-cameras-every-30-seconds': {
+    'stream-all-cameras-every-1-second': {
         'task': 'gismap.tasks.streaming_tasks.stream_all_cameras',
-        'schedule': timedelta(seconds=30),
+        'schedule': timedelta(seconds=1),
     },
-    'detect-all-cameras-every-30-seconds': {
+    'detect-all-cameras-every-1-second': {
         'task': 'gismap.tasks.streaming_tasks.detect_all_cameras',
-        'schedule': timedelta(seconds=30),
+        'schedule': timedelta(seconds=1),
     },
 }
 
