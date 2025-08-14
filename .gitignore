@@ -11,4 +11,3 @@ env/
 *.pyo
 *.pyd
 debug_plates/
-git push
