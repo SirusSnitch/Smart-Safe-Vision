@@ -21,6 +21,7 @@ from asgiref.sync import async_to_sync
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from gismap.tasks.ocr_task import run_ocr_task
+from tensorflow.keras.models import load_model
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -74,14 +75,40 @@ class YOLODetector:
             logger.error(f"Erreur détection YOLO: {e}")
             return [], None
 
+# --- FireNet Detector ---
+class FireNetDetector:
+    def __init__(self, model_path: str):
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Modèle FireNet non trouvé: {model_path}")
+        self.model = load_model(model_path)
+        logger.info(f"✅ Modèle FireNet chargé: {model_path}")
+
+    def predict_fire(self, frame: np.ndarray) -> float:
+        """
+        Expects BGR frame. Returns probability of fire [0,1]
+        """
+        try:
+            img = cv2.resize(frame, (128, 128))  # FireNet usually expects 128x128
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = img / 255.0
+            img = np.expand_dims(img, axis=0)  # Add batch dimension
+            prob = float(self.model.predict(img)[0][0])  # Assuming output is [prob]
+            return prob
+        except Exception as e:
+            logger.error(f"Erreur prédiction FireNet: {e}")
+            return 0.0
+
+
 # --- Load models ---
 model_path_best = os.path.abspath(os.path.join(current_dir, "..", "yolo", "best.pt"))
 model_path_box = os.path.abspath(os.path.join(current_dir, "..", "yolo", "box.pt"))
 model_path_pose = os.path.abspath(os.path.join(current_dir, "..", "yolo", "yolov8s-pose.pt"))
+fire_model_path = os.path.abspath(os.path.join(current_dir, "..", "yolo", "FireNet.h5"))
 
 detector_best = YOLODetector(model_path_best)
 detector_box = YOLODetector(model_path_box)
 pose_detector = YOLO(model_path_pose)  # pose model loaded directly, no wrapper
+fire_detector = FireNetDetector(fire_model_path)
 
 # --- Redis connection ---
 try:
@@ -329,6 +356,18 @@ def detect_from_redis(camera_id: int, max_iterations: int = 1000):
                         )
             else:
                 logger.info(f"📦 Aucun objet détecté par box.pt (Cam {camera_id})")
+
+            # --- Fire detection ---
+            fire_prob = fire_detector.predict_fire(frame)
+            if fire_prob > 0.5:  # threshold can be tuned
+                cv2.putText(annotated_frame, f"🔥 Fire {fire_prob:.2f}", (10, 30), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
+                send_generic_detection_notification.delay(
+                    alert_type="fire",
+                    camera_id=camera_id,
+                    label="Fire",
+                    details={"probability": fire_prob}
+                )
 
             # --- Pose detection & annotation ---
             pose_results = pose_detector.predict(

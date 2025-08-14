@@ -503,3 +503,27 @@ def send_aggression_alert(camera_id, camera_name=None, details=None):
     except Exception as e:
         logger.error(f"[NOTIF] Erreur envoi alerte Aggression: {e}")
         return {"success": False, "error": str(e)}
+
+
+@shared_task
+def send_fire_alert(camera_id, camera_name=None, details=None):
+    """
+    Envoyer une notification quand un feu est détecté
+    """
+    try:
+        message = "🔥 Détection de feu"
+        send_system_alert.delay(
+            message=message,
+            alert_type="fire",
+            priority="high",
+            details={
+                "camera_id": camera_id,
+                "camera_name": camera_name,
+                **(details or {})
+            }
+        )
+        logger.info(f"[NOTIF] Alerte Fire envoyée - Caméra {camera_id}")
+        return {"success": True, "camera_id": camera_id}
+    except Exception as e:
+        logger.error(f"[NOTIF] Erreur envoi alerte Fire: {e}")
+        return {"success": False, "error": str(e)}
