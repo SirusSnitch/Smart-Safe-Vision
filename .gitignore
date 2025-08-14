@@ -1,6 +1,8 @@
 # Ignore Python virtual environment
 venv/
 
+venv311/
+
 env/
 
 # Ignore compiled Python files
@@ -9,3 +11,4 @@ env/
 *.pyo
 *.pyd
 debug_plates/
+git push
