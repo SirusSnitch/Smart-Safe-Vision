@@ -600,7 +600,7 @@ function initMap(urlConfig) {
               title: props.name,
               icon: L.icon({
                 iconUrl:
-                  "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+                  "https://cdn-icons-png.flaticon.com/512/2499/2499215.png",
                 iconSize: [30, 30],
                 iconAnchor: [15, 30],
                 popupAnchor: [0, -30],
