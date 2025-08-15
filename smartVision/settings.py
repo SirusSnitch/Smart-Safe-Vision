@@ -191,10 +191,6 @@ EMAIL_SENDER = "dridi.nourchenee@gmail.com"
 EMAIL_HOST_PASSWORD = 'cgev gbwc hugo bxtz'
 
 
-GDAL_LIBRARY_PATH = r"C:\OSGeo4W\bin\gdal311.dll"
-GEOS_LIBRARY_PATH = r"C:\OSGeo4W\bin\geos_c.dll"
-
-
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
