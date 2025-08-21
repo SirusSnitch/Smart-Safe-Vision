@@ -1,36 +1,44 @@
 import os
 from django.core.asgi import get_asgi_application
-from django.conf import settings
-
-# Définit la variable d'environnement pour les settings Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'smartVision.settings')
-
-# Import de l'application ASGI Django classique (HTTP)
-django_asgi_app = get_asgi_application()
-
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
+from channels.middleware import BaseMiddleware
+import gismap.routing  # your websocket routes
 
-import gismap.routing  # adapte selon ton app
+# Set Django settings module
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'smartVision.settings')
 
-from starlette.middleware.base import BaseHTTPMiddleware
+# HTTP app (Django)
+django_asgi_app = get_asgi_application()
 
-class LoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        print(f"Request URL: {request.url}")
-        response = await call_next(request)
-        print(f"Response status: {response.status_code}")
+# --- HTTP Logging Middleware (Django style, better in settings.py normally) ---
+class HttpLoggingMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        print(f"[HTTP] {request.method} {request.path}")
+        response = self.get_response(request)
+        print(f"[HTTP] Response {response.status_code}")
         return response
 
-# Compose le routeur ASGI pour HTTP et WebSocket
+# --- WebSocket Logging Middleware ---
+class WebSocketLoggingMiddleware(BaseMiddleware):
+    async def __call__(self, scope, receive, send):
+        print(f"[WebSocket] New connection at {scope['path']}")
+        try:
+            return await super().__call__(scope, receive, send)
+        finally:
+            print(f"[WebSocket] Connection closed at {scope['path']}")
+
+# --- Main ASGI application ---
 application = ProtocolTypeRouter({
-    "http": django_asgi_app,  # Requête HTTP classique gérée par Django
-    "websocket": AuthMiddlewareStack(  # WebSocket avec authentification utilisateur
-        URLRouter(
-            gismap.routing.websocket_urlpatterns  # URLs WebSocket définies dans gismap/routing.py
+    "http": django_asgi_app,  # Handles normal HTTP requests
+    "websocket": AuthMiddlewareStack(
+        WebSocketLoggingMiddleware(  # Log WebSocket connections
+            URLRouter(
+                gismap.routing.websocket_urlpatterns
+            )
         )
     ),
 })
-
-# Ajoute le middleware de logging (optionnel)
-application = LoggingMiddleware(application)

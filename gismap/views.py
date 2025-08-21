@@ -15,13 +15,13 @@ from django.contrib.gis.serializers import geojson
 from urllib.parse import urlparse
 import subprocess
 #from tasks.streaming_tasks import stream_camera
-
 import os
 import cv2
 import threading
 import time
 from datetime import datetime
 from gismap.models import DetectionMatricule
+import redis
 
 def alertes_matricules(request):
     alertes = DetectionMatricule.objects.filter(est_autorise=False)\
@@ -52,48 +52,53 @@ def generate_hls_url(rtsp_url):
     parsed = urlparse(rtsp_url)
     stream_name = parsed.path.split('/')[-1]  # Récupère le nom du flux (ex: 'stream1')
     return f"http://192.168.1.30:8888/{stream_name}/index.m3u8"
+
+# Connect to Redis
+redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+
 def process_camera_stream(camera_id, rtsp_url):
     print(f"[{camera_id}] Started processing thread for {rtsp_url}")
     cap = cv2.VideoCapture(rtsp_url)
 
     if not cap.isOpened():
-        print(f"[{camera_id}] Échec de la connexion au flux")
+        print(f"[{camera_id}] Failed to connect to stream")
         return
-
-    camera_dir = f"media/captures/camera_{camera_id}"
-    os.makedirs(camera_dir, exist_ok=True)
-
-    last_saved = time.time()
 
     while True:
         ret, frame = cap.read()
         if not ret:
-            print(f"[{camera_id}] Frame non reçue")
+            print(f"[{camera_id}] Frame not received, retrying in 1s")
             time.sleep(1)
             continue
 
-        now = time.time()
-        if now - last_saved >= 30:  # 30 secondes
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"{camera_dir}/frame_{timestamp}.jpg"
-            cv2.imwrite(filename, frame)
-            print(f"[{camera_id}] Image enregistrée: {filename}")
-            last_saved = now
+        # Convert frame to JPEG bytes
+        ret, buffer = cv2.imencode('.jpg', frame)
+        if not ret:
+            print(f"[{camera_id}] Failed to encode frame")
+            continue
 
-        # Limite la charge CPU
-        time.sleep(0.03)
+        frame_bytes = buffer.tobytes()
+
+        # Store frame in Redis (key: camera:<id>:frame)
+        redis_client.set(f"camera:{camera_id}:frame", frame_bytes)
+
+        # Limit to ~1 FPS
+        time.sleep(1)
 
 
 running_threads = {}
-def start_camera_thread(id, url):
-    if id not in running_threads:
-        t = threading.Thread(target=process_camera_stream, args=(id, url), daemon=True)
+def start_camera_thread(camera_id, rtsp_url):
+    if camera_id not in running_threads or not running_threads[camera_id].is_alive():
+        t = threading.Thread(
+            target=process_camera_stream, 
+            args=(camera_id, rtsp_url), 
+            daemon=True
+        )
         t.start()
-        running_threads[id] = t
-        print(f"[INFO] Thread caméra {id} lancé. Threads actifs : {threading.active_count()}")
-        print(f"[DEBUG] Threads caméras en cours : {list(running_threads.keys())}")
+        running_threads[camera_id] = t
+        print(f"[INFO] Camera thread {camera_id} started. Active threads: {threading.active_count()}")
     else:
-        print(f"[INFO] Le thread pour la caméra {id} est déjà en cours.")
+        print(f"[INFO] Camera thread {camera_id} already running")
 
 
 
@@ -202,54 +207,48 @@ def delete_polygon(request, polygon_id):
 
 @csrf_exempt
 def save_camera(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            name = data.get('name')
-            rtsp_url = data.get('url')
-            hls_url = generate_hls_url(rtsp_url)  #
-            coordinates = data.get('coordinates')  # [lng, lat]
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-            if not name or not hls_url or not coordinates:
-                return JsonResponse({'error': 'Name, URL, and coordinates are required'}, status=400)
+    try:
+        data = json.loads(request.body)
+        name = data.get('name')
+        rtsp_url = data.get('url')
+        coordinates = data.get('coordinates')  # [lng, lat]
 
-            point = Point(coordinates[0], coordinates[1])
+        if not name or not rtsp_url or not coordinates:
+            return JsonResponse({'error': 'Name, URL, and coordinates are required'}, status=400)
 
-            # Vérifier que la caméra est dans un lieu (polygone)
-            department = None
-            for lieu in Lieu.objects.all():
-                if lieu.polygon.contains(point):
-                    department = lieu
-                    break
+        point = Point(coordinates[0], coordinates[1])
 
-            if department is None:
-                # Pas dans un lieu -> Refus
-                return JsonResponse({
-                    'status': 'error',
-                    'message': "La caméra doit être placée à l'intérieur d'un département existant."
-                }, status=400)
+        # Verify camera is inside a department
+        department = None
+        for lieu in Lieu.objects.all():
+            if lieu.polygon.contains(point):
+                department = lieu
+                break
 
-            camera = Camera.objects.create(
-                name=name,
-                rtsp_url=rtsp_url,
-                hls_url=hls_url,
-                location=point,
-                department=department
-            )
-          #  capture_frame.delay(camera.id, rtsp_url)  # lance la tâche asynchrone Celery
+        if department is None:
+            return JsonResponse({'status': 'error', 'message': "Camera must be inside a department."}, status=400)
 
-            start_camera_thread(camera.id, rtsp_url)
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Camera saved successfully',
-                'id': camera.id,
-                'department_id': department.id
-            })
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
+        camera = Camera.objects.create(
+            name=name,
+            rtsp_url=rtsp_url,
+            hls_url=generate_hls_url(rtsp_url),
+            location=point,
+            department=department
+        )
+
+        # Start camera thread
+        start_camera_thread(camera.id, rtsp_url)
+
+        return JsonResponse({'status': 'success', 'id': camera.id, 'department_id': department.id})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 def get_cameras(request):
     if request.method == 'GET':
@@ -299,17 +298,12 @@ def live_stream(request):
 
 def all_cameras_stream(request):
     departement_id = request.GET.get('departement_id')
-    departements = Lieu.objects.all()  # Tous les départements (Lieu)
+    departements = Lieu.objects.all()
 
-    if departement_id:
-        cameras = Camera.objects.filter(department_id=departement_id)
-    else:
-        cameras = Camera.objects.all()
+    cameras = Camera.objects.filter(department_id=departement_id) if departement_id else Camera.objects.all()
 
-    # Démarrer les threads pour les caméras qui n'ont pas encore de thread actif
     for camera in cameras:
-        if camera.id not in running_threads:
-            start_camera_thread(camera.id, camera.rtsp_url)
+        start_camera_thread(camera.id, camera.rtsp_url)
 
     context = {
         'cameras': cameras,
@@ -317,6 +311,7 @@ def all_cameras_stream(request):
         'selected_departement_id': departement_id,
     }
     return render(request, 'all_cameras.html', context)
+
 
 
 

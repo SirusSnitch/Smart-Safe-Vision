@@ -50,23 +50,11 @@ INSTALLED_APPS = [
             'django_celery_beat',
 
 
-
-
 ]
-from celery.schedules import crontab
-from celery.schedules import timedelta
 
 
-CELERY_BEAT_SCHEDULE = {
-    'stream-all-cameras-every-30-seconds': {
-        'task': 'gismap.tasks.streaming_tasks.stream_all_cameras',
-        'schedule': timedelta(seconds=30),
-    },
-    'detect-all-cameras-every-30-seconds': {
-        'task': 'gismap.tasks.streaming_tasks.detect_all_cameras',
-        'schedule': timedelta(seconds=30),
-    },
-}
+
+CELERY_BEAT_SCHEDULE = {}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
