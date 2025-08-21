@@ -79,13 +79,12 @@
             <h3 class="text-lg font-medium text-gray-800 ml-3 truncate">{{ cam.name }}</h3>
           </div>
           
-          <!-- Conteneur image MJPEG -->
+          <!-- Conteneur flux WebSocket -->
           <div class="relative pb-[56.25%] bg-gray-900">
-            <img 
-              src="{% url 'stream_camera_view' cam.id %}" 
-              alt="Flux live {{ cam.name }}" 
-              class="absolute top-0 left-0 w-full h-full object-cover"
-              />
+            <canvas 
+              id="camera-{{ cam.id }}" 
+              class="absolute top-0 left-0 w-full h-full object-cover">
+            </canvas>
           </div>
           
           <!-- Pied de carte avec heure locale -->
@@ -119,5 +118,35 @@
     </div>
   </div>
 </div>
+
+<!-- Script WebSocket pour recevoir et afficher les frames -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const socket = new WebSocket("ws://" + window.location.host + "/ws/notifications/");
+
+  socket.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    // data attendu: { camera_id: 1, frame: "<base64>" }
+    const cameraId = data.camera_id;
+    const frame = data.frame;
+
+    const canvas = document.getElementById("camera-" + cameraId);
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.onload = function() {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    };
+    img.src = "data:image/jpeg;base64," + frame;
+  };
+
+  socket.onerror = function(err) {
+    console.error("WebSocket error:", err);
+  };
+});
+</script>
 {% endlocaltime %}
 {% endblock %}
