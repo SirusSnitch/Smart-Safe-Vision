@@ -1,6 +1,7 @@
 # ============================================================================ 
 # YOLO_DETECT_TASK.PY - Multi-model detection, OCR only on best.pt detections
 # WebSocket streaming at ~1 FPS, duplicate frames skipped
+# FireNet/TensorFlow removed, pose and plates logic untouched
 # ============================================================================
 
 import base64
@@ -20,7 +21,6 @@ from django.utils import timezone
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from gismap.tasks.ocr_task import run_ocr_task
-from tensorflow.keras.models import load_model
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -30,6 +30,7 @@ current_dir = os.path.dirname(__file__)
 # ============================================================================ 
 # YOLO Detector Wrapper
 # ============================================================================
+
 class YOLODetector:
     def __init__(self, model_path: str):
         self.model_path = model_path
@@ -38,10 +39,10 @@ class YOLODetector:
 
     def load_model(self):
         if not os.path.exists(self.model_path):
-            raise FileNotFoundError(f"Modèle non trouvé: {self.model_path}")
+            raise FileNotFoundError(f"Model not found: {self.model_path}")
         device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = YOLO(self.model_path).to(device)
-        logger.info(f"✅ YOLO chargé sur {device.upper()}: {self.model_path}")
+        logger.info(f"✅ YOLO loaded on {device.upper()}: {self.model_path}")
 
     def detect(self, frame: np.ndarray, conf_threshold: float = 0.25):
         try:
@@ -72,52 +73,33 @@ class YOLODetector:
             return [], None
 
 # ============================================================================ 
-# FireNet Detector
-# ============================================================================
-class FireNetDetector:
-    def __init__(self, model_path: str):
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Modèle FireNet non trouvé: {model_path}")
-        self.model = load_model(model_path)
-        logger.info(f"✅ FireNet chargé: {model_path}")
-
-    def predict_fire(self, frame: np.ndarray) -> float:
-        try:
-            img = cv2.resize(frame, (128, 128))
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) / 255.0
-            img = np.expand_dims(img, axis=0)
-            return float(self.model.predict(img)[0][0])
-        except Exception as e:
-            logger.error(f"❌ FireNet predict() error: {e}")
-            return 0.0
-
-# ============================================================================ 
 # Load Models
 # ============================================================================
+
 model_path_best = os.path.abspath(os.path.join(current_dir, "..", "yolo", "best.pt"))
 model_path_box = os.path.abspath(os.path.join(current_dir, "..", "yolo", "box.pt"))
 model_path_pose = os.path.abspath(os.path.join(current_dir, "..", "yolo", "yolov8s-pose.pt"))
-fire_model_path = os.path.abspath(os.path.join(current_dir, "..", "yolo", "FireNet.h5"))
 
 detector_best = YOLODetector(model_path_best)
 detector_box = YOLODetector(model_path_box)
 pose_detector = YOLO(model_path_pose)
-fire_detector = FireNetDetector(fire_model_path)
 
 # ============================================================================ 
 # Redis
 # ============================================================================
+
 try:
     r = redis.StrictRedis(host="localhost", port=6379, db=0, socket_timeout=5)
     r.ping()
-    logger.info("✅ Redis connecté")
+    logger.info("✅ Redis connected")
 except redis.ConnectionError:
-    logger.error("❌ Impossible de se connecter à Redis")
+    logger.error("❌ Cannot connect to Redis")
     raise
 
 # ============================================================================ 
 # Helpers
 # ============================================================================
+
 def decode_frame_from_redis(encoded_frame: bytes) -> Optional[np.ndarray]:
     try:
         img_data = base64.b64decode(encoded_frame + b"=" * (-len(encoded_frame) % 4))
@@ -182,6 +164,7 @@ def classify_pose(result, frame_height):
 # ============================================================================ 
 # Main Detection Task
 # ============================================================================
+
 @shared_task
 def detect_from_redis(camera_id: int, max_iterations: int = 1000):
     logger.info(f"🚀 Start detection cam {camera_id}")
@@ -190,7 +173,7 @@ def detect_from_redis(camera_id: int, max_iterations: int = 1000):
     max_consecutive_errors = 10
     try:
         while iterations < max_iterations:
-            encoded_frame = r.get(f"camera:{camera_id}:frame")  # ✅ Correct key
+            encoded_frame = r.get(f"camera:{camera_id}:frame")
             if not encoded_frame:
                 logger.warning(f"[{camera_id}] No frame found in Redis")
                 time.sleep(0.5)
@@ -199,8 +182,9 @@ def detect_from_redis(camera_id: int, max_iterations: int = 1000):
             frame = decode_frame_from_redis(encoded_frame)
             if frame is None:
                 consecutive_errors += 1
+                logger.warning(f"[{camera_id}] Frame decode failed, consecutive errors: {consecutive_errors}")
                 if consecutive_errors > max_consecutive_errors:
-                    logger.error(f"[{camera_id}] Too many decode errors, stopping")
+                    logger.error(f"[{camera_id}] Too many decode errors, stopping detection")
                     break
                 time.sleep(0.2)
                 continue
@@ -208,20 +192,19 @@ def detect_from_redis(camera_id: int, max_iterations: int = 1000):
             frame = cv2.resize(frame, (640, 384))
             annotated_frame = frame.copy()
 
+            logger.info(f"[{camera_id}] Iteration {iterations+1}: frame decoded successfully")
+
             # --- YOLO best ---
             detections_best, _ = detector_best.detect(frame)
+            logger.info(f"[{camera_id}] YOLO best detections: {len(detections_best)}")
             if detections_best:
                 annotated_frame = process_detections(annotated_frame, detections_best, camera_id, run_ocr=True)
 
             # --- YOLO box ---
             detections_box, _ = detector_box.detect(frame)
+            logger.info(f"[{camera_id}] YOLO box detections: {len(detections_box)}")
             if detections_box:
                 annotated_frame = process_detections(annotated_frame, detections_box, camera_id, run_ocr=False)
-
-            # --- FireNet ---
-            fire_prob = fire_detector.predict_fire(frame)
-            if fire_prob > 0.5:
-                logger.info(f"🔥 Fire prob {fire_prob:.2f} cam {camera_id}")
 
             # --- Pose ---
             pose_results = pose_detector.predict(
@@ -231,20 +214,23 @@ def detect_from_redis(camera_id: int, max_iterations: int = 1000):
                 verbose=False
             )
             persons = classify_pose(pose_results[0], frame.shape[0])
-            for label, _ in persons:
-                if label in ("Fallen", "Aggression"):
-                    logger.info(f"⚠️ Pose {label} detected cam {camera_id}")
+            if persons:
+                for label, _ in persons:
+                    logger.info(f"[{camera_id}] Pose detected: {label}")
+            else:
+                logger.info(f"[{camera_id}] No persons detected in this frame")
 
             # --- Send frame ---
             send_ws_frame(camera_id, annotated_frame)
+            logger.debug(f"[{camera_id}] Frame sent via WebSocket")
 
             torch.cuda.empty_cache()
             gc.collect()
-            time.sleep(0.1)  # small sleep to limit loop speed
+            time.sleep(0.1)
             iterations += 1
 
     except Exception as e:
-        logger.error(f"❌ Main loop error: {e}")
+        logger.error(f"[{camera_id}] Main detection loop error: {e}")
     finally:
-        logger.info(f"🧹 End detection cam {camera_id}")
+        logger.info(f"🧹 End detection cam {camera_id}, iterations completed: {iterations}")
         return {"camera_id": camera_id, "iterations_completed": iterations, "status": "completed"}
