@@ -743,7 +743,7 @@ function initMap(urlConfig) {
         title: "Modifier la caméra",
         html: `
       <input id="cam-edit-name" class="swal2-input" placeholder="Nom de la caméra" value="${camera.name}">
-      <input id="cam-edit-url" class="swal2-input" placeholder="URL de la caméra" value="${camera.url}">
+      <input id="cam-edit-url" class="swal2-input" placeholder="URL de la caméra" value="${camera.rtsp_url}">
       <button id="move-camera-btn" class="swal2-confirm swal2-styled" style="background:#f39c12; margin-top:5px;">
         <i class="fas fa-arrows-alt"></i> Déplacer la caméra
       </button>
