@@ -17,7 +17,7 @@ def add_base64_padding(s):
 def stream_camera_view(request, camera_id):
     def generate():
         while True:
-            frame_data = redis_client.get(f"camera_frame_{camera_id}")
+            frame_data = redis_client.get(f"camera:{camera_id}:frame")
             if frame_data:
                 try:
                     frame_str = frame_data.decode('utf-8').strip()

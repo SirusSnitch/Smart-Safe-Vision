@@ -12,4 +12,7 @@ start cmd /k "call venv311\Scripts\activate && celery -A smartVision beat -l inf
 REM Start Celery worker in a new terminal
 start cmd /k "call venv311\Scripts\activate && celery -A smartVision worker -l info"
 
+REM Start MediaMTX in a new terminal
+start cmd /k "%~dp0\mediamtx\mediamtx.exe"
+
 

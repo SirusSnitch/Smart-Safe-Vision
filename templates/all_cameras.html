@@ -81,7 +81,7 @@
           
           <!-- Canvas container for WS stream -->
           <div class="relative pb-[56.25%] bg-gray-900">
-            <canvas id="camera-{{ cam.id }}" class="absolute top-0 left-0 w-full h-full object-cover"></canvas>
+            <canvas id="camera-{{ cam.id }}" width="1280" height="720" class="absolute top-0 left-0"></canvas>
           </div>
           
           <!-- Card footer -->
@@ -93,36 +93,48 @@
             <span class="text-xs text-gray-500">{% now "H:i" %}</span>
           </div>
 
-          <!-- Inline WebSocket script per camera -->
           <script>
-            (function() {
-              const ws = new WebSocket("ws://" + window.location.host + "/ws/stream/{{ cam.id }}/");
+  (function () {
+    const cameraId = "{{ cam.id }}";
+    const canvas = document.getElementById("camera-" + cameraId);
+    const ctx = canvas.getContext("2d");
 
-              ws.onopen = () => console.log("✅ WS connected to camera {{ cam.id }}");
+    // Connect to WebSocket
+    const ws = new WebSocket("ws://" + window.location.host + "/ws/stream/" + cameraId + "/");
 
-              ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                const canvas = document.getElementById("camera-" + data.camera_id);
-                if (!canvas) return;
+    ws.onopen = () => console.log(`✅ WS connected to camera ${cameraId}`);
 
-                const ctx = canvas.getContext("2d");
-                const img = new Image();
-                img.onload = () => {
-                  canvas.width = img.width;
-                  canvas.height = img.height;
-                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                };
-                img.src = "data:image/jpeg;base64," + data.frame;
-              };
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
 
-              ws.onerror = (err) => console.error("❌ WS error camera {{ cam.id }}:", err);
+      if (!data.frame) {
+        console.warn(`⚠️ No frame for camera ${cameraId}`);
+        return;
+      }
 
-              ws.onclose = () => {
-                console.warn("⚠️ WS closed camera {{ cam.id }}, reconnecting in 3s...");
-                setTimeout(() => window.location.reload(), 3000);
-              };
-            })();
-          </script>
+      const img = new Image();
+      img.onload = () => {
+        // Dynamically resize canvas to match frame size
+        if (canvas.width !== img.width || canvas.height !== img.height) {
+          canvas.width = img.width;
+          canvas.height = img.height;
+        }
+
+        // Draw the frame
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      };
+      img.src = "data:image/jpeg;base64," + data.frame;
+    };
+
+    ws.onerror = (err) => console.error(`❌ WS error camera ${cameraId}:`, err);
+
+    ws.onclose = () => {
+      console.warn(`⚠️ WS closed camera ${cameraId}, reconnecting in 3s...`);
+      setTimeout(() => window.location.reload(), 3000);
+    };
+  })();
+</script>
+
         </div>
       {% empty %}
         <div class="col-span-full">
