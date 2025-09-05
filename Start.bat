@@ -13,3 +13,5 @@ REM Start Celery worker in a new terminal
 start cmd /k "call venv311\Scripts\activate && celery -A smartVision worker --loglevel=info"
 
 
+
+

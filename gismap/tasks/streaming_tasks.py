@@ -10,22 +10,24 @@ from gismap.tasks.yolo_detect_task import detect_from_redis
 
 redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 
-# Keep track of running cameras and detection tasks
 running_cameras = set()
 running_detections = set()
 
 
 @shared_task(name="gismap.streaming_tasks.stream_rtsp_camera")
-def stream_camera(camera_id, rtsp_url, fps=1):
+def stream_camera(camera_id, rtsp_url, width=640, height=480, fps=1):
     if camera_id in running_cameras:
         print(f"[{camera_id}] Already streaming, skipping duplicate task")
         return
     running_cameras.add(camera_id)
 
-    print(f"[{camera_id}] FFmpeg streaming started")
+    print(f"[{camera_id}] FFmpeg streaming started for {rtsp_url}")
+
     ffmpeg_cmd = [
         "ffmpeg",
+        "-rtsp_transport", "tcp",
         "-i", rtsp_url,
+        "-s", f"{width}x{height}",
         "-f", "rawvideo",
         "-pix_fmt", "bgr24",
         "-vf", f"fps={fps}",
@@ -40,7 +42,6 @@ def stream_camera(camera_id, rtsp_url, fps=1):
         bufsize=10**8
     )
 
-    width, height = 1280, 720
     frame_size = width * height * 3
     detection_started = False
 
@@ -48,10 +49,10 @@ def stream_camera(camera_id, rtsp_url, fps=1):
         while True:
             raw_frame = process.stdout.read(frame_size)
             if len(raw_frame) != frame_size:
-                err = process.stderr.read(1024).decode('utf-8', errors='ignore')
-                print(f"[{camera_id}] Frame incomplete ({len(raw_frame)} bytes), retrying...")
+                err = process.stderr.read(4096).decode("utf-8", errors="ignore")
+                print(f"[{camera_id}] Incomplete frame ({len(raw_frame)} bytes)")
                 if err:
-                    print(f"[{camera_id}] FFmpeg stderr: {err.strip()}")
+                    print(f"[{camera_id}] FFmpeg error: {err.strip()}")
                 time.sleep(1)
                 continue
 
@@ -65,7 +66,7 @@ def stream_camera(camera_id, rtsp_url, fps=1):
             redis_client.set(f"camera:{camera_id}:frame", jpg_base64, ex=5)
             print(f"[{camera_id}] Frame pushed to Redis")
 
-            # Start YOLO detection once, after the first frame
+            # Start YOLO detection once
             if not detection_started:
                 if camera_id not in running_detections:
                     detect_from_redis.delay(camera_id)
@@ -74,7 +75,7 @@ def stream_camera(camera_id, rtsp_url, fps=1):
                     print(f"[{camera_id}] YOLO detection started")
 
     except Exception as e:
-        print(f"[{camera_id}] Error in FFmpeg stream: {e}")
+        print(f"[{camera_id}] Exception: {e}")
     finally:
         process.kill()
         running_cameras.remove(camera_id)

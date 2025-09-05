@@ -582,9 +582,11 @@ function initMap(urlConfig) {
 
   // Function to load and display cameras as markers
   function loadCameras() {
+    console.log("Loading cameras...");
     fetch(urlConfig.getCameras)
       .then((res) => res.json())
       .then((data) => {
+        console.log("Camera data from API:", data);
         cameraLayer.clearLayers(); // clear old markers
 
         const cameraList = document.getElementById("camera-list");
@@ -606,11 +608,14 @@ function initMap(urlConfig) {
                 popupAnchor: [0, -30],
               }),
             });
+
+            const hlsUrl = `/static/hls/${props.name}.m3u8`;
+
             marker.bindPopup(`
   <div style="width: 320px; height: 240px;">
     <strong>${props.name}</strong><br>
-    <video width="300" height="200" controls autoplay data-src="${props.rtsp_url}" muted></video>
-    <p style="font-size: 0.85em; color: gray;">${props.rtsp_url}</p>
+    <video width="300" height="200" controls autoplay data-src="${hlsUrl}" muted></video>
+    <p style="font-size: 0.85em; color: gray;">${hlsUrl}</p>
   </div>
 `);
 
@@ -670,6 +675,7 @@ function initMap(urlConfig) {
   }
 
   function addCameraToSidebar(camera) {
+    console.log("Camera object in sidebar:", camera);
     const cameraList = document.getElementById("camera-list");
 
     const cameraItem = document.createElement("div");
@@ -681,7 +687,7 @@ function initMap(urlConfig) {
   <div class="camera-department">${
     camera.department_name || "Aucun département"
   }</div>
-  <a href="${camera.url}" target="_blank" class="camera-link">Voir la caméra</a>
+  <a href="${camera.hls_url}" target="_blank" class="camera-link">Voir la caméra</a>
   <button class="btn btn-edit-camera" title="Modifier la caméra" style="margin-left: 10px; color: green; border: none; background: transparent; cursor: pointer;">
     <i class="fas fa-edit"></i>
   </button>
@@ -689,6 +695,8 @@ function initMap(urlConfig) {
     <i class="fas fa-trash"></i>
   </button>
 `;
+console.log("map.js loaded");
+
 
     // Click on item centers map on marker and opens popup
     cameraItem.addEventListener("click", (e) => {
@@ -781,7 +789,7 @@ function initMap(urlConfig) {
                 body: JSON.stringify({
                   id: camera.id,
                   name: camera.name,
-                  url: camera.url,
+                  url: camera.rtsp_url,
                   coordinates: [newLatLng.lng, newLatLng.lat],
                 }),
               })
