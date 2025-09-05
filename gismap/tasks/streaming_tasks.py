@@ -6,7 +6,6 @@ import time
 import numpy as np
 import cv2
 from gismap.models import Camera
-from gismap.streaming_utils import should_start_stream
 from gismap.tasks.yolo_detect_task import detect_from_redis
 
 redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
@@ -89,8 +88,9 @@ def stream_camera(camera_id, rtsp_url, width=640, height=480, fps=1):
 def stream_all_cameras():
     cameras = Camera.objects.all()
     for camera in cameras:
-        if should_start_stream(camera.id):
+        if camera.id not in running_cameras:   # ✅ check directly
             stream_camera.delay(camera.id, camera.rtsp_url)
+
 
 
 @shared_task(name="gismap.tasks.streaming_tasks.detect_all_cameras")
