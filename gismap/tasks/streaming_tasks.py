@@ -1,15 +1,16 @@
 from celery import shared_task
 import subprocess
 import redis
-import base64
 import time
 import numpy as np
 import cv2
 from gismap.models import Camera
 from gismap.tasks.yolo_detect_task import detect_from_redis
 
+# Redis client
 redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 
+# Track active streams and detections
 running_cameras = set()
 running_detections = set()
 
@@ -56,14 +57,17 @@ def stream_camera(camera_id, rtsp_url, width=640, height=480, fps=1):
                 time.sleep(1)
                 continue
 
+            # Convert raw frame to OpenCV image
             frame = np.frombuffer(raw_frame, np.uint8).reshape((height, width, 3))
+
+            # Encode as JPEG
             ret, buffer = cv2.imencode(".jpg", frame)
             if not ret:
                 print(f"[{camera_id}] JPEG encoding failed")
                 continue
 
-            jpg_base64 = base64.b64encode(buffer).decode("utf-8")
-            redis_client.set(f"camera:{camera_id}:frame", jpg_base64, ex=5)
+            # ✅ Push raw JPEG bytes (not base64) into Redis
+            redis_client.set(f"camera:{camera_id}:frame", buffer.tobytes(), ex=5)
             print(f"[{camera_id}] Frame pushed to Redis")
 
             # Start YOLO detection once
@@ -90,7 +94,6 @@ def stream_all_cameras():
     for camera in cameras:
         if camera.id not in running_cameras:   # ✅ check directly
             stream_camera.delay(camera.id, camera.rtsp_url)
-
 
 
 @shared_task(name="gismap.tasks.streaming_tasks.detect_all_cameras")
