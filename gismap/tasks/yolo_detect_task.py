@@ -1,10 +1,7 @@
-# ============================================================================ 
+# ============================================================================
 # YOLO_DETECT_TASK.PY - Multi-model detection, OCR only on best.pt detections
 # WebSocket streaming at ~1 FPS, duplicate frames skipped
-# FireNet/TensorFlow removed, pose and plates logic untouched
 # ============================================================================
-
-import base64
 import cv2
 import numpy as np
 import torch
@@ -27,10 +24,9 @@ logger = logging.getLogger(__name__)
 
 current_dir = os.path.dirname(__file__)
 
-# ============================================================================ 
+# ============================================================================
 # YOLO Detector Wrapper
 # ============================================================================
-
 class YOLODetector:
     def __init__(self, model_path: str):
         self.model_path = model_path
@@ -72,10 +68,9 @@ class YOLODetector:
             logger.error(f"❌ YOLO detect() error: {e}")
             return [], None
 
-# ============================================================================ 
+# ============================================================================
 # Load Models
 # ============================================================================
-
 model_path_best = os.path.abspath(os.path.join(current_dir, "..", "yolo", "best.pt"))
 model_path_box = os.path.abspath(os.path.join(current_dir, "..", "yolo", "box.pt"))
 model_path_pose = os.path.abspath(os.path.join(current_dir, "..", "yolo", "yolov8s-pose.pt"))
@@ -84,10 +79,9 @@ detector_best = YOLODetector(model_path_best)
 detector_box = YOLODetector(model_path_box)
 pose_detector = YOLO(model_path_pose)
 
-# ============================================================================ 
+# ============================================================================
 # Redis
 # ============================================================================
-
 try:
     r = redis.StrictRedis(host="localhost", port=6379, db=0, socket_timeout=5)
     r.ping()
@@ -96,14 +90,13 @@ except redis.ConnectionError:
     logger.error("❌ Cannot connect to Redis")
     raise
 
-# ============================================================================ 
+# ============================================================================
 # Helpers
 # ============================================================================
-
-def decode_frame_from_redis(encoded_frame: bytes) -> Optional[np.ndarray]:
+def decode_frame_from_redis(jpeg_bytes: bytes) -> Optional[np.ndarray]:
+    """Decode raw JPEG bytes (not base64) from Redis into a cv2 frame."""
     try:
-        img_data = base64.b64decode(encoded_frame + b"=" * (-len(encoded_frame) % 4))
-        np_arr = np.frombuffer(img_data, np.uint8)
+        np_arr = np.frombuffer(jpeg_bytes, np.uint8)
         return cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
     except Exception as e:
         logger.error(f"❌ Frame decode error: {e}")
@@ -112,19 +105,30 @@ def decode_frame_from_redis(encoded_frame: bytes) -> Optional[np.ndarray]:
 _last_sent_frame_hash = {}
 
 def send_ws_frame(camera_id: int, frame: np.ndarray):
+    """Send frame over WebSocket, avoid duplicates, enforce ~1 FPS."""
     global _last_sent_frame_hash
     try:
         _, buffer = cv2.imencode(".jpg", frame)
         frame_bytes = buffer.tobytes()
         frame_hash = hashlib.md5(frame_bytes).hexdigest()
+
         last_hash, last_time = _last_sent_frame_hash.get(camera_id, (None, 0))
         now = time.time()
+
         if frame_hash != last_hash or now - last_time >= 1.0:
+            # Still base64 for WebSocket JSON transport
+            import base64
             frame_b64 = base64.b64encode(frame_bytes).decode("utf-8")
+
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
                 "camera_streams",
-                {"type": "send_frame", "camera_id": camera_id, "frame": frame_b64, "timestamp": timezone.now().isoformat()}
+                {
+                    "type": "send_frame",
+                    "camera_id": camera_id,
+                    "frame": frame_b64,
+                    "timestamp": timezone.now().isoformat()
+                }
             )
             _last_sent_frame_hash[camera_id] = (frame_hash, now)
             logger.debug(f"📤 WS frame sent cam {camera_id}")
@@ -132,18 +136,21 @@ def send_ws_frame(camera_id: int, frame: np.ndarray):
         logger.error(f"❌ WebSocket error: {e}")
 
 def process_detections(frame, detections, camera_id, run_ocr=False):
+    """Draw bounding boxes and optionally run OCR on plates."""
     annotated = frame.copy()
     for det in detections:
         x1, y1, x2, y2 = det["bbox"]
         label = f"{det['class_name']} {det['confidence']:.2f}"
         cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(annotated, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+        cv2.putText(annotated, label, (x1, y1 - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
         if run_ocr and det["class_name"] == "plate":
             roi = frame[y1:y2, x1:x2]
             run_ocr_task.delay(camera_id, roi.tolist())
     return annotated
 
 def classify_pose(result, frame_height):
+    """Classify person pose into Fallen / Aggression / Normal."""
     persons = []
     try:
         if result.keypoints is not None:
@@ -161,25 +168,25 @@ def classify_pose(result, frame_height):
         logger.error(f"❌ classify_pose error: {e}")
     return persons
 
-# ============================================================================ 
+# ============================================================================
 # Main Detection Task
 # ============================================================================
-
 @shared_task
 def detect_from_redis(camera_id: int, max_iterations: int = 1000):
     logger.info(f"🚀 Start detection cam {camera_id}")
     iterations = 0
     consecutive_errors = 0
     max_consecutive_errors = 10
+
     try:
         while iterations < max_iterations:
-            encoded_frame = r.get(f"camera:{camera_id}:frame")
-            if not encoded_frame:
+            jpeg_bytes = r.get(f"camera:{camera_id}:frame")
+            if not jpeg_bytes:
                 logger.warning(f"[{camera_id}] No frame found in Redis")
                 time.sleep(0.5)
                 continue
 
-            frame = decode_frame_from_redis(encoded_frame)
+            frame = decode_frame_from_redis(jpeg_bytes)
             if frame is None:
                 consecutive_errors += 1
                 logger.warning(f"[{camera_id}] Frame decode failed, consecutive errors: {consecutive_errors}")
@@ -188,6 +195,7 @@ def detect_from_redis(camera_id: int, max_iterations: int = 1000):
                     break
                 time.sleep(0.2)
                 continue
+
             consecutive_errors = 0
             frame = cv2.resize(frame, (640, 384))
             annotated_frame = frame.copy()
@@ -214,15 +222,13 @@ def detect_from_redis(camera_id: int, max_iterations: int = 1000):
                 verbose=False
             )
             persons = classify_pose(pose_results[0], frame.shape[0])
-            if persons:
-                for label, _ in persons:
-                    logger.info(f"[{camera_id}] Pose detected: {label}")
-            else:
+            for label, _ in persons:
+                logger.info(f"[{camera_id}] Pose detected: {label}")
+            if not persons:
                 logger.info(f"[{camera_id}] No persons detected in this frame")
 
             # --- Send frame ---
             send_ws_frame(camera_id, annotated_frame)
-            logger.debug(f"[{camera_id}] Frame sent via WebSocket")
 
             torch.cuda.empty_cache()
             gc.collect()
