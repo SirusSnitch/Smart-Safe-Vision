@@ -1,6 +1,6 @@
 # ============================================================================
 # YOLO_DETECT_TASK.PY - Multi-model detection, OCR only on best.pt detections
-# WebSocket streaming at ~1 FPS, duplicate frames skipped
+# Annotated frames pushed back to Redis at frame:{camera_id}:detection
 # ============================================================================
 import cv2
 import numpy as np
@@ -12,11 +12,7 @@ import time
 import gc
 import os
 import logging
-import hashlib
 from typing import Optional
-from django.utils import timezone
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
 from gismap.tasks.ocr_task import run_ocr_task
 
 logging.basicConfig(level=logging.INFO)
@@ -101,39 +97,6 @@ def decode_frame_from_redis(jpeg_bytes: bytes) -> Optional[np.ndarray]:
     except Exception as e:
         logger.error(f"❌ Frame decode error: {e}")
         return None
-
-_last_sent_frame_hash = {}
-
-def send_ws_frame(camera_id: int, frame: np.ndarray):
-    """Send frame over WebSocket, avoid duplicates, enforce ~1 FPS."""
-    global _last_sent_frame_hash
-    try:
-        _, buffer = cv2.imencode(".jpg", frame)
-        frame_bytes = buffer.tobytes()
-        frame_hash = hashlib.md5(frame_bytes).hexdigest()
-
-        last_hash, last_time = _last_sent_frame_hash.get(camera_id, (None, 0))
-        now = time.time()
-
-        if frame_hash != last_hash or now - last_time >= 1.0:
-            # Still base64 for WebSocket JSON transport
-            import base64
-            frame_b64 = base64.b64encode(frame_bytes).decode("utf-8")
-
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                "camera_streams",
-                {
-                    "type": "send_frame",
-                    "camera_id": camera_id,
-                    "frame": frame_b64,
-                    "timestamp": timezone.now().isoformat()
-                }
-            )
-            _last_sent_frame_hash[camera_id] = (frame_hash, now)
-            logger.debug(f"📤 WS frame sent cam {camera_id}")
-    except Exception as e:
-        logger.error(f"❌ WebSocket error: {e}")
 
 def process_detections(frame, detections, camera_id, run_ocr=False):
     """Draw bounding boxes and optionally run OCR on plates."""
@@ -227,8 +190,13 @@ def detect_from_redis(camera_id: int, max_iterations: int = 1000):
             if not persons:
                 logger.info(f"[{camera_id}] No persons detected in this frame")
 
-            # --- Send frame ---
-            send_ws_frame(camera_id, annotated_frame)
+            # --- Push annotated frame back to Redis ---
+            try:
+                _, buffer = cv2.imencode(".jpg", annotated_frame)
+                r.set(f"frame:{camera_id}:detection", buffer.tobytes(), ex=5)
+                print(f"[{camera_id}] ✅ Detection frame pushed to Redis as frame:{camera_id}:detection")
+            except Exception as e:
+                logger.error(f"[{camera_id}] Redis push error: {e}")
 
             torch.cuda.empty_cache()
             gc.collect()
