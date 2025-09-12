@@ -1,10 +1,12 @@
 # gismap/consumers.py
 import json
-import redis
 import asyncio
+import base64
+import redis.asyncio as aioredis
 from channels.generic.websocket import AsyncWebsocketConsumer
 
-redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+# Async Redis client
+redis_client = aioredis.from_url("redis://localhost:6379")
 
 class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -19,21 +21,13 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(message))
 
 
-
-# gismap/consumers.py
-
-import redis.asyncio as aioredis
-
-# Async Redis client
-redis_client = aioredis.from_url("redis://localhost:6379", decode_responses=True)
-
 class CameraStreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.camera_id = self.scope['url_route']['kwargs']['camera_id']
         await self.accept()
         print(f"[WS] Client connected to camera {self.camera_id}")
 
-        # Start async loop to push frames
+        # Start async loop to push annotated frames
         self.task = asyncio.create_task(self.send_frames())
 
     async def disconnect(self, close_code):
@@ -48,13 +42,22 @@ class CameraStreamConsumer(AsyncWebsocketConsumer):
     async def send_frames(self):
         try:
             while True:
-                # Get latest frame from Redis
-                frame_data = await redis_client.get(f"camera:{self.camera_id}:frame")
-                if frame_data:
+                # Get latest annotated frame from Redis (raw JPEG bytes)
+                key = f"frame:{self.camera_id}:detection"
+                jpeg_bytes = await redis_client.get(key)
+
+                if jpeg_bytes:
+                    # Convert JPEG bytes -> base64 for WebSocket transport
+                    frame_b64 = base64.b64encode(jpeg_bytes).decode("utf-8")
+
                     await self.send_json({
                         "camera_id": self.camera_id,
-                        "frame": frame_data  # already base64
+                        "frame": frame_b64
                     })
-                await asyncio.sleep(1/10)  # 10 fps
+
+                    print(f"[WS] Sent frame for camera {self.camera_id}")
+
+                # Adjust fps (currently 10 fps max)
+                await asyncio.sleep(0.1)
         except asyncio.CancelledError:
-            print(f"[WS] Frame sending loop cancelled for camera {self.camera_id}")
+            print(f"[WS] Frame loop cancelled for camera {self.camera_id}")

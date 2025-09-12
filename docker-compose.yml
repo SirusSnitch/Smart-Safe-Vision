@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: postgres
+    environment:
+      POSTGRES_DB: smartvision
+      POSTGRES_USER: smartvision_user
+      POSTGRES_PASSWORD: smartvision_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: smartvision_app
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    environment:
+      DATABASE_URL: postgres://smartvision_user:smartvision_pass@db:5432/smartvision
+      REDIS_URL: redis://redis:6379/0
+    command: ["/app/start.sh"]
+
+volumes:
+  postgres_data:
