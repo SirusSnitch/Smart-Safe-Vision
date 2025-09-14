@@ -760,10 +760,15 @@ pathDefaults:
 # for example "~^(test1|test2)$" will match both "test1" and "test2",
 # for example "~^prefix" will match all paths that start with "prefix".
 paths:
-  # example:
-  # my_camera:
-  #   source: rtsp://my_camera
+  all:
+    publishUser: ""
+    publishPass: ""
+    readUser: ""
+    readPass: ""
 
-  # Settings under path "all_others" are applied to all paths that
-  # do not match another entry.
-  all_others:
+  cam3:
+    publishUser: ""
+    publishPass: ""
+    readUser: ""
+    readPass: ""
+
