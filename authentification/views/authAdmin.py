@@ -9,6 +9,43 @@ from django.utils.crypto import get_random_string
 from authentification.forms.formsAdmin import *
 from gismap.models import *
 
+
+import redis
+import cv2
+import numpy as np
+from gismap.tasks.fire_clip_tasks import detect_fire_from_redis
+import redis
+import cv2
+
+
+
+from gismap.tasks.fire_clip_tasks import detect_fire_from_redis
+import redis
+import cv2
+import json
+
+# Connexion Redis
+r = redis.StrictRedis(host="localhost", port=6379, db=0)
+
+# Charger image test
+frame = cv2.imread("fire.jpg")
+frame = cv2.resize(frame, (640, 384))
+_, buffer = cv2.imencode(".jpg", frame)
+r.set("camera:1:frame", buffer.tobytes(), ex=10)
+
+# Appeler tâche directement
+result = detect_fire_from_redis(camera_id=1, max_iterations=1)
+print("Result returned by Celery task:", result)
+
+# Lire le résultat depuis Redis pour vérifier
+res_redis = r.get("result:1:fire")
+if res_redis:
+    print("Result from Redis:", json.loads(res_redis))
+else:
+    print("No result found in Redis")
+
+
+
 def is_admin(user):
     return user.role == User.Role.ADMIN
 def is_super(user):
