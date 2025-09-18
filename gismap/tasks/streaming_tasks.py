@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 from gismap.models import Camera
 from gismap.tasks.yolo_detect_task import detect_from_redis
-
+from gismap.tasks.fire_clip_tasks import detect_fire_from_redis
 # Redis client
 redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 
@@ -73,6 +73,7 @@ def stream_camera(camera_id, rtsp_url, width=640, height=480, fps=1):
             # Start YOLO detection once
             if not detection_started:
                 if camera_id not in running_detections:
+                    detect_fire_from_redis.delay(camera_id)
                     detect_from_redis.delay(camera_id)
                     running_detections.add(camera_id)
                     detection_started = True
@@ -101,3 +102,12 @@ def detect_all_cameras():
     cameras = Camera.objects.all()
     for camera in cameras:
         detect_from_redis.delay(camera.id)
+
+
+
+@shared_task(name="gismap.tasks.streaming_tasks.start_fire_detection_all")
+def start_fire_detection_all():
+    from gismap.models import Camera
+    cameras = Camera.objects.all()
+    for cam in cameras:
+        detect_fire_from_redis.delay(cam.id)
