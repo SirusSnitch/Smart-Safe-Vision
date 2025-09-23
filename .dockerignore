@@ -1,0 +1,31 @@
+# Ignore virtual environments
+venv/
+venv311/
+env/
+
+# Ignore Python cache
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore git files
+.git
+.gitignore
+
+# Ignore Docker files themselves (not needed inside image)
+Dockerfile
+docker-compose.yml
+
+# Ignore debug or local stuff
+debug_plates/
+mediamtx/
+*.log
+*.sqlite3
+
+# Ignore OS/editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.bat
