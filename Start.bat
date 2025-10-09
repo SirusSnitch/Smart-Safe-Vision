@@ -1,16 +1,34 @@
 @echo off
+REM ===============================================
+REM Smart-Safe-Vision Startup Script
+REM Activates virtual environment, starts Uvicorn,
+REM Celery beat & worker, and MediaMTX in order
+REM ===============================================
 
 REM Activate virtual environment
 call venv311\Scripts\activate
 
-REM Start Uvicorn in a new terminal
+REM -------------------------------
+REM Start Uvicorn (API server)
+REM -------------------------------
 start cmd /k "call venv311\Scripts\activate && uvicorn smartVision.asgi:application --reload"
 
-REM Start Celery beat in a new terminal
+REM -------------------------------
+REM Start Celery beat
+REM -------------------------------
 start cmd /k "call venv311\Scripts\activate && celery -A smartVision beat -l info"
 
-REM Start Celery worker in a new terminal
+REM -------------------------------
+REM Wait a few seconds to ensure Uvicorn & DB are ready
+REM -------------------------------
+timeout /t 5 /nobreak >nul
+
+REM -------------------------------
+REM Start Celery worker
+REM -------------------------------
 start cmd /k "call venv311\Scripts\activate && celery -A smartVision worker --loglevel=info"
 
-REM Start MediaMTX in a new terminal
-start cmd /k "%~dp0\mediamtx\mediamtx.exe"
+REM -------------------------------
+REM Start MediaMTX from the mediamtx folder
+REM -------------------------------
+start cmd /k "cd /d %~dp0mediamtx && mediamtx.exe"

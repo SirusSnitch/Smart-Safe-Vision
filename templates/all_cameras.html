@@ -94,45 +94,41 @@
           </div>
 
           <script>
-  (function () {
-    const cameraId = "{{ cam.id }}";
-    const canvas = document.getElementById("camera-" + cameraId);
-    const ctx = canvas.getContext("2d");
+(function () {
+  const cameraId = "{{ cam.id }}";
+  const canvas = document.getElementById("camera-" + cameraId);
+  const ctx = canvas.getContext("2d");
 
-    // Connect to WebSocket
-    const ws = new WebSocket("ws://" + window.location.host + "/ws/stream/" + cameraId + "/");
+  const ws = new WebSocket("ws://" + window.location.host + "/ws/stream/" + cameraId + "/");
+  ws.binaryType = "arraybuffer"; // 🔑 Expect binary frames
 
-    ws.onopen = () => console.log(`✅ WS connected to camera ${cameraId}`);
+  ws.onopen = () => console.log(`✅ WS connected to camera ${cameraId}`);
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+  ws.onmessage = (event) => {
+    const arrayBuffer = event.data; // raw JPEG bytes
+    const blob = new Blob([arrayBuffer], { type: "image/jpeg" });
+    const url = URL.createObjectURL(blob);
 
-      if (!data.frame) {
-        console.warn(`⚠️ No frame for camera ${cameraId}`);
-        return;
+    const img = new Image();
+    img.onload = () => {
+      if (canvas.width !== img.width || canvas.height !== img.height) {
+        canvas.width = img.width;
+        canvas.height = img.height;
       }
-
-      const img = new Image();
-      img.onload = () => {
-        // Dynamically resize canvas to match frame size
-        if (canvas.width !== img.width || canvas.height !== img.height) {
-          canvas.width = img.width;
-          canvas.height = img.height;
-        }
-
-        // Draw the frame
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      };
-      img.src = "data:image/jpeg;base64," + data.frame;
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url); // free memory
     };
+    img.src = url;
+  };
 
-    ws.onerror = (err) => console.error(`❌ WS error camera ${cameraId}:`, err);
+  ws.onerror = (err) => console.error(`❌ WS error camera ${cameraId}:`, err);
 
-    ws.onclose = () => {
-      console.warn(`⚠️ WS closed camera ${cameraId}, reconnecting in 3s...`);
-      setTimeout(() => window.location.reload(), 3000);
-    };
-  })();
+  ws.onclose = () => {
+    console.warn(`⚠️ WS closed camera ${cameraId}, reconnecting in 3s...`);
+    setTimeout(() => window.location.reload(), 3000);
+  };
+})();
+
 </script>
 
         </div>

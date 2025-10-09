@@ -22,18 +22,19 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
 # gismap/consumers.py
 
+# gismap/consumers.py
 import redis.asyncio as aioredis
+import asyncio
+from channels.generic.websocket import AsyncWebsocketConsumer
 
 # Async Redis client
-redis_client = aioredis.from_url("redis://localhost:6379", decode_responses=True)
+redis_client = aioredis.from_url("redis://localhost:6379")
 
 class CameraStreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.camera_id = self.scope['url_route']['kwargs']['camera_id']
         await self.accept()
         print(f"[WS] Client connected to camera {self.camera_id}")
-
-        # Start async loop to push frames
         self.task = asyncio.create_task(self.send_frames())
 
     async def disconnect(self, close_code):
@@ -48,13 +49,12 @@ class CameraStreamConsumer(AsyncWebsocketConsumer):
     async def send_frames(self):
         try:
             while True:
-                # Get latest frame from Redis
+                # Get latest JPEG bytes from Redis
                 frame_data = await redis_client.get(f"camera:{self.camera_id}:frame")
                 if frame_data:
-                    await self.send_json({
-                        "camera_id": self.camera_id,
-                        "frame": frame_data  # already base64
-                    })
-                await asyncio.sleep(1/10)  # 10 fps
+                    # 🔑 Send raw binary instead of JSON
+                    await self.send(bytes_data=frame_data)
+
+                await asyncio.sleep(1/15)  # ~15 fps
         except asyncio.CancelledError:
             print(f"[WS] Frame sending loop cancelled for camera {self.camera_id}")
