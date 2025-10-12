@@ -27,8 +27,3 @@ REM -------------------------------
 REM Start Celery worker
 REM -------------------------------
 start cmd /k "call venv311\Scripts\activate && celery -A smartVision worker --loglevel=info"
-
-REM -------------------------------
-REM Start MediaMTX from the mediamtx folder
-REM -------------------------------
-start cmd /k "cd /d %~dp0mediamtx && mediamtx.exe"

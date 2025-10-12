@@ -50,7 +50,7 @@ class CameraStreamConsumer(AsyncWebsocketConsumer):
         try:
             while True:
                 # Get latest JPEG bytes from Redis
-                frame_data = await redis_client.get(f"camera:{self.camera_id}:frame")
+                frame_data = await redis_client.get(f"frame:{self.camera_id}:detection")
                 if frame_data:
                     # 🔑 Send raw binary instead of JSON
                     await self.send(bytes_data=frame_data)

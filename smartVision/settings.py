@@ -98,9 +98,6 @@ CHANNEL_LAYERS = {
 
 AUTH_USER_MODEL = 'authentification.User'
 
-GDAL_LIBRARY_PATH = r"C:\Program Files\GDAL\gdal.dll"
-GEOS_LIBRARY_PATH = r"C:\Program Files\GDAL\geos_c.dll"
-
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 tmpPostgres = urlparse(os.getenv("DATABASE_URL"))
